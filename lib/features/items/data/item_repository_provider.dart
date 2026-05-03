@@ -6,4 +6,4 @@ import 'item_repository.dart';
 final itemRepositoryProvider = Provider<ItemRepository>((ref) {
   final database = ref.watch(appDatabaseProvider);
   return ItemRepository(database);
-});flutt
+});
