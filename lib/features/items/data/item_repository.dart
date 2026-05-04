@@ -1,3 +1,5 @@
+import 'package:drift/drift.dart';
+
 import '../../../core/database/app_database.dart';
 
 class ItemRepository {
@@ -18,6 +20,19 @@ class ItemRepository {
   }
 
   Future<int> deleteItem(int id) {
-    return (_database.delete(_database.items)..where((tbl) => tbl.id.equals(id))).go();
+    return (_database.delete(
+      _database.items,
+    )..where((tbl) => tbl.id.equals(id))).go();
+  }
+
+  Future<int> togglePurchased(Item item) {
+    return (_database.update(
+      _database.items,
+    )..where((tbl) => tbl.id.equals(item.id))).write(
+      ItemsCompanion(
+        isPurchased: Value(!item.isPurchased),
+        updateAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
   }
 }
