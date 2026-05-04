@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_startup_app/features/home/presentation/home_screen.dart';
+
+import 'core/theme/app_theme.dart';
+import 'features/home/presentation/home_screen.dart';
 
 class StartupApp extends StatelessWidget {
   const StartupApp({super.key});
@@ -8,8 +10,8 @@ class StartupApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Startup App',
-      theme: ThemeData(useMaterial3: true),
+      title: 'Çeyiz Takip',
+      theme: AppTheme.lightTheme,
       home: const HomeScreen(),
     );
   }
