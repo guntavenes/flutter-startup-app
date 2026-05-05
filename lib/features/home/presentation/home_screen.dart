@@ -133,33 +133,43 @@ Widget _buildSummary(List<Item> items) {
   final purchased = items.where((e) => e.isPurchased).length;
   final remaining = total - purchased;
 
-  return Row(
+  final totalExpense = items
+      .where((e) => e.isPurchased && e.purchasedPrice != null)
+      .fold<double>(0, (sum, item) => sum + item.purchasedPrice!);
+
+  return Column(
     children: [
-      _summaryCard(
-        'Toplam',
-        total,
-        Icons.list_alt_rounded,
-        const Color(0xFFFF8DBA),
+      Row(
+        children: [
+          _summaryCard(
+            'Toplam',
+            total.toString(),
+            Icons.list_alt_rounded,
+            const Color(0xFFFF8DBA),
+          ),
+          const SizedBox(width: 10),
+          _summaryCard(
+            'Alınan',
+            purchased.toString(),
+            Icons.check_circle_rounded,
+            const Color(0xFF7ACFA6),
+          ),
+          const SizedBox(width: 10),
+          _summaryCard(
+            'Kalan',
+            remaining.toString(),
+            Icons.hourglass_bottom_rounded,
+            const Color(0xFFFFB74D),
+          ),
+        ],
       ),
-      const SizedBox(width: 10),
-      _summaryCard(
-        'Alınan',
-        purchased,
-        Icons.check_circle_rounded,
-        const Color(0xFF7ACFA6),
-      ),
-      const SizedBox(width: 10),
-      _summaryCard(
-        'Kalan',
-        remaining,
-        Icons.hourglass_bottom_rounded,
-        const Color(0xFFFFB74D),
-      ),
+      const SizedBox(height: 10),
+      _expenseCard(totalExpense),
     ],
   );
 }
 
-Widget _summaryCard(String title, int value, IconData icon, Color color) {
+Widget _summaryCard(String title, String value, IconData icon, Color color) {
   return Expanded(
     child: Container(
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
@@ -180,7 +190,7 @@ Widget _summaryCard(String title, int value, IconData icon, Color color) {
           Icon(icon, color: color, size: 22),
           const SizedBox(height: 8),
           Text(
-            value.toString(),
+            value,
             style: const TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w900,
@@ -198,6 +208,65 @@ Widget _summaryCard(String title, int value, IconData icon, Color color) {
           ),
         ],
       ),
+    ),
+  );
+}
+
+Widget _expenseCard(double totalExpense) {
+  return Container(
+    width: double.infinity,
+    padding: const EdgeInsets.all(18),
+    decoration: BoxDecoration(
+      gradient: const LinearGradient(
+        colors: [Color(0xFFD96BA7), Color(0xFFFF8DBA)],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+      borderRadius: BorderRadius.circular(26),
+      boxShadow: [
+        BoxShadow(
+          color: const Color(0xFFD96BA7).withValues(alpha: 0.22),
+          blurRadius: 24,
+          offset: const Offset(0, 12),
+        ),
+      ],
+    ),
+    child: Row(
+      children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.22),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: const Icon(Icons.payments_outlined, color: Colors.white),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Toplam Harcama',
+                style: TextStyle(
+                  color: Colors.white70,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${totalExpense.toStringAsFixed(2)} ₺',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     ),
   );
 }
@@ -271,6 +340,16 @@ Widget _buildItemList(List<Item> items, WidgetRef ref) {
     );
   }
 
+  String _buildItemSubtitle(Item item) {
+  final status = item.isPurchased ? 'Alındı' : 'Alınmadı';
+
+  if (item.purchasedPrice == null) {
+    return status;
+  }
+
+  return '$status • ${item.purchasedPrice!.toStringAsFixed(2)} ₺';
+}
+
   return ListView.builder(
     itemCount: items.length,
     itemBuilder: (context, index) {
@@ -324,7 +403,7 @@ Widget _buildItemList(List<Item> items, WidgetRef ref) {
                   ),
                   const SizedBox(height: 5),
                   Text(
-                    item.isPurchased ? 'Alındı' : 'Alınmadı',
+                    _buildItemSubtitle(item),
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
@@ -365,4 +444,6 @@ Widget _buildItemList(List<Item> items, WidgetRef ref) {
       );
     },
   );
+
+  
 }
