@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
+import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -15,21 +16,10 @@ class HomeScreen extends ConsumerWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final repository = ref.read(itemRepositoryProvider);
-
-          final now = DateTime.now().millisecondsSinceEpoch;
-
-          await repository.addItem(
-            ItemsCompanion.insert(
-              categoryId: 1,
-              name: 'Deneme Ürün',
-              createdAt: now,
-              updateAt: now,
-            ),
-          );
-
-          ref.invalidate(allItemsProvider);
+        onPressed: () {
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const ItemFormScreen()));
         },
         child: const Icon(Icons.add),
       ),
