@@ -56,7 +56,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
               const SizedBox(height: 14),
               Expanded(
                 child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 100),
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 90),
                   itemCount: filteredItems.length,
                   itemBuilder: (context, index) {
                     final item = filteredItems[index];
@@ -83,7 +83,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
 
   Widget _buildSearchBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 14, 18, 0),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.92),
@@ -130,8 +130,8 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
         .fold<double>(0, (sum, item) => sum + item.purchasedPrice!);
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(18, 18, 18, 0),
-      padding: const EdgeInsets.all(22),
+      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFFF8DBA), Color(0xFFD96BA7)],
@@ -153,7 +153,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
           Text(
             widget.category.name,
             style: const TextStyle(
-              fontSize: 24,
+              fontSize: 20,
               fontWeight: FontWeight.w900,
               color: Colors.white,
             ),
@@ -175,7 +175,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
 
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(22),
@@ -194,7 +194,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                 Text(
                   '${totalExpense.toStringAsFixed(2)} ₺',
                   style: const TextStyle(
-                    fontSize: 28,
+                    fontSize: 22,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
                   ),
@@ -209,11 +209,11 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
 
   Widget _buildItemCard(Item item) {
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.92),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
         boxShadow: [
           BoxShadow(
@@ -230,8 +230,8 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
             child: item.imagePath != null && item.imagePath!.isNotEmpty
                 ? Image.file(
                     File(item.imagePath!),
-                    width: 54,
-                    height: 54,
+                    width: 44,
+                    height: 44,
                     fit: BoxFit.cover,
                   )
                 : Container(
@@ -257,7 +257,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                 Text(
                   item.name,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 14,
                     fontWeight: FontWeight.w800,
                     color: Color(0xFF2C1E26),
                   ),

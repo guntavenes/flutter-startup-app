@@ -479,17 +479,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         );
       },
       child: Container(
-        margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(14),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.92),
-          borderRadius: BorderRadius.circular(28),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(color: const Color(0xFFFFD6EA), width: 1.1),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFD96BA7).withValues(alpha: 0.12),
-              blurRadius: 24,
-              offset: const Offset(0, 12),
+              color: const Color(0xFFD96BA7).withValues(alpha: 0.16),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
@@ -499,13 +499,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Row(
               children: [
                 Container(
-                  width: 46,
-                  height: 46,
+                  width: 40,
+                  height: 40,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFFFC7E3), Color(0xFFFFEEF7)],
                     ),
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
                     _getCategoryIcon(category.name),
@@ -520,7 +520,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Text(
                         category.name,
                         style: const TextStyle(
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: FontWeight.w900,
                           color: Color(0xFF2C1E26),
                         ),
@@ -565,10 +565,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(14),
+              padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
                 color: const Color(0xFFFFF7FB),
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -584,7 +584,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   Text(
                     '${totalExpense.toStringAsFixed(2)} ₺',
                     style: const TextStyle(
-                      fontSize: 20,
+                      fontSize: 16,
                       fontWeight: FontWeight.w900,
                       color: Color(0xFFD96BA7),
                     ),
@@ -601,10 +601,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _miniInfoCard(String title, String value, Color color) {
     return Expanded(
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
+        padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(15),
         ),
         child: Column(
           children: [
@@ -620,7 +620,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Text(
               title,
               style: const TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w700,
                 color: Color(0xFF8A6B79),
               ),
