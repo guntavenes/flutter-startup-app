@@ -4,6 +4,7 @@ import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
+import 'dart:io';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -497,21 +498,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
       child: Row(
         children: [
-          Container(
-            width: 52,
-            height: 52,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFFFC7E3), Color(0xFFFFEEF7)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Icon(
-              Icons.shopping_bag_outlined,
-              color: Color(0xFFD96BA7),
-            ),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: item.imagePath != null && item.imagePath!.isNotEmpty
+                ? Image.file(
+                    File(item.imagePath!),
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.cover,
+                  )
+                : Container(
+                    width: 52,
+                    height: 52,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFFC7E3), Color(0xFFFFEEF7)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: const Icon(
+                      Icons.shopping_bag_outlined,
+                      color: Color(0xFFD96BA7),
+                    ),
+                  ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -519,7 +530,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.name,
+                  item.name.trim().isEmpty ? 'İsimsiz Ürün' : item.name,
                   style: const TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,

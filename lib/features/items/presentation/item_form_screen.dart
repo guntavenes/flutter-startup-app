@@ -5,6 +5,9 @@ import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
+import 'dart:io';
+
+import 'package:image_picker/image_picker.dart';
 
 class ItemFormScreen extends ConsumerStatefulWidget {
   const ItemFormScreen({super.key});
@@ -25,6 +28,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
 
   bool _isPurchased = false;
   int? _selectedCategoryId;
+  String? _selectedImagePath;
 
   @override
   void dispose() {
@@ -57,6 +61,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
         purchasedPrice: Value(price),
         link: Value(_emptyToNull(_linkController.text)),
         note: Value(_emptyToNull(_noteController.text)),
+        imagePath: Value(_selectedImagePath),
         isPurchased: Value(_isPurchased),
         purchaseDate: _isPurchased ? Value(now) : const Value.absent(),
         createdAt: now,
@@ -103,8 +108,9 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
               child: Column(
                 children: [
                   _buildFormHeader(),
-
                   const SizedBox(height: 20),
+                  _buildImagePicker(),
+                  const SizedBox(height: 14),
                   _buildTextField(
                     controller: _nameController,
                     label: 'Ürün adı',
@@ -383,6 +389,61 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
           'Kaydet',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
+      ),
+    );
+  }
+
+  Future<void> _pickImage() async {
+    final picker = ImagePicker();
+
+    final pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 75,
+    );
+
+    if (pickedFile == null) {
+      return;
+    }
+
+    setState(() {
+      _selectedImagePath = pickedFile.path;
+    });
+  }
+
+  Widget _buildImagePicker() {
+    return GestureDetector(
+      onTap: _pickImage,
+      child: Container(
+        width: double.infinity,
+        height: 150,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+        ),
+        child: _selectedImagePath == null
+            ? const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.add_photo_alternate_outlined,
+                    color: Color(0xFFD96BA7),
+                    size: 36,
+                  ),
+                  SizedBox(height: 8),
+                  Text(
+                    'Fotoğraf ekle',
+                    style: TextStyle(
+                      color: Color(0xFF8A6B79),
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              )
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(26),
+                child: Image.file(File(_selectedImagePath!), fit: BoxFit.cover),
+              ),
       ),
     );
   }
