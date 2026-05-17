@@ -5,6 +5,7 @@ import 'package:flutter_startup_app/features/categories/presentation/category_de
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
+import 'package:flutter_startup_app/features/items/presentation/item_list_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -40,7 +41,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 26, 18, 0),
+            padding: const EdgeInsets.fromLTRB(14, 18, 14, 0),
             child: itemsAsync.when(
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(child: Text('Hata: $error')),
@@ -50,7 +51,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildHeader(),
-                      const SizedBox(height: 18),
+                      const SizedBox(height: 14),
 
                       allItemsAsync.when(
                         loading: () => _buildSummary([]),
@@ -58,15 +59,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                         data: (allItems) => _buildSummary(allItems),
                       ),
 
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
 
                       _buildRecentPurchasedCard(),
 
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 14),
 
                       _buildFilters(),
 
-                      const SizedBox(height: 16),
+                      const SizedBox(height: 10),
 
                       groupedItemsAsync.when(
                         loading: () => const Center(
@@ -97,7 +98,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFFF8DBA), Color(0xFFD96BA7), Color(0xFFFFB6D5)],
@@ -116,8 +117,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Row(
         children: [
           Container(
-            width: 58,
-            height: 58,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.25),
               borderRadius: BorderRadius.circular(22),
@@ -134,7 +135,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 Text(
                   'Çeyiz Takip',
                   style: TextStyle(
-                    fontSize: 27,
+                    fontSize: 23,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
                   ),
@@ -174,6 +175,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               total.toString(),
               Icons.list_alt_rounded,
               const Color(0xFFFF8DBA),
+              onTap: () => _openItemList('Tüm Ürünler', items),
             ),
             const SizedBox(width: 10),
             _summaryCard(
@@ -181,6 +183,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               purchased.toString(),
               Icons.check_circle_rounded,
               const Color(0xFF7ACFA6),
+              onTap: () => _openItemList(
+                'Alınan Ürünler',
+                items.where((e) => e.isPurchased).toList(),
+              ),
             ),
             const SizedBox(width: 10),
             _summaryCard(
@@ -188,6 +194,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               remaining.toString(),
               Icons.hourglass_bottom_rounded,
               const Color(0xFFFFB74D),
+              onTap: () => _openItemList(
+                'Kalan Ürünler',
+                items.where((e) => !e.isPurchased).toList(),
+              ),
             ),
           ],
         ),
@@ -197,45 +207,62 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _summaryCard(String title, String value, IconData icon, Color color) {
+  Widget _summaryCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
     return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 10),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: Colors.white),
-          boxShadow: [
-            BoxShadow(
-              color: color.withValues(alpha: 0.18),
-              blurRadius: 22,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 8),
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF2C1E26),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: Colors.white),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.18),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
               ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF8A6B79),
-                fontWeight: FontWeight.w700,
+            ],
+          ),
+          child: Column(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(height: 8),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF2C1E26),
+                ),
               ),
-            ),
-          ],
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF8A6B79),
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  void _openItemList(String title, List<Item> items) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ItemListScreen(title: title, items: items),
       ),
     );
   }
@@ -243,7 +270,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _expenseCard(double totalExpense) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFD96BA7), Color(0xFFFF8DBA)],
@@ -262,8 +289,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       child: Row(
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.22),
               borderRadius: BorderRadius.circular(18),
@@ -287,7 +314,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   '${totalExpense.toStringAsFixed(2)} ₺',
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: 19,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
@@ -453,7 +480,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.92),
           borderRadius: BorderRadius.circular(28),
@@ -472,8 +499,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             Row(
               children: [
                 Container(
-                  width: 54,
-                  height: 54,
+                  width: 46,
+                  height: 46,
                   decoration: BoxDecoration(
                     gradient: const LinearGradient(
                       colors: [Color(0xFFFFC7E3), Color(0xFFFFEEF7)],
@@ -493,7 +520,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       Text(
                         category.name,
                         style: const TextStyle(
-                          fontSize: 17,
+                          fontSize: 15,
                           fontWeight: FontWeight.w900,
                           color: Color(0xFF2C1E26),
                         ),
@@ -625,7 +652,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       },
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.92),
           borderRadius: BorderRadius.circular(26),
@@ -641,8 +668,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: Row(
           children: [
             Container(
-              width: 48,
-              height: 48,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFFD96BA7), Color(0xFFFF8DBA)],
