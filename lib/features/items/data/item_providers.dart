@@ -33,8 +33,7 @@ final itemsProvider = FutureProvider<List<Item>>((ref) async {
 final groupedItemsProvider = FutureProvider<Map<Category, List<Item>>>((
   ref,
 ) async {
-  final items = await ref.watch(itemsProvider.future);
-  final categories = await ref.watch(categoriesProvider.future);
+final items = await ref.watch(allItemsProvider.future);  final categories = await ref.watch(categoriesProvider.future);
 
   final Map<Category, List<Item>> grouped = {};
 

@@ -5,6 +5,8 @@ import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 import 'dart:io';
+import 'package:flutter_startup_app/features/items/presentation/item_detail_screen.dart';
+import 'package:flutter_startup_app/features/categories/presentation/category_detail_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -351,12 +353,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildGroupedItemList(Map<Category, List<Item>> groupedItems) {
-    final categories = groupedItems.keys.toList();
+    final currentFilter = ref.watch(itemFilterProvider);
 
-    if (groupedItems.values.every((items) => items.isEmpty)) {
+    final categories = groupedItems.keys.where((category) {
+      final items = groupedItems[category] ?? [];
+
+      if (currentFilter == ItemFilter.all) {
+        return true;
+      }
+
+      if (currentFilter == ItemFilter.remaining) {
+        return items.any((item) => !item.isPurchased);
+      }
+
+      if (currentFilter == ItemFilter.purchased) {
+        return items.any((item) => item.isPurchased);
+      }
+
+      return true;
+    }).toList();
+
+    if (categories.isEmpty) {
       return const Center(
         child: Text(
-          'Henüz ürün eklenmedi',
+          'Bu filtrede ürün yok',
           style: TextStyle(
             color: Color(0xFF8A6B79),
             fontWeight: FontWeight.w600,
@@ -365,6 +385,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
+    categories.sort((a, b) {
+      final aItems = groupedItems[a]!;
+      final bItems = groupedItems[b]!;
+
+      if (aItems.isEmpty && bItems.isNotEmpty) return 1;
+      if (bItems.isEmpty && aItems.isNotEmpty) return -1;
+
+      if (aItems.isNotEmpty && bItems.isNotEmpty) {
+        final aLast = aItems
+            .map((e) => e.createdAt)
+            .reduce((v, e) => v > e ? v : e);
+
+        final bLast = bItems
+            .map((e) => e.createdAt)
+            .reduce((v, e) => v > e ? v : e);
+
+        return bLast.compareTo(aLast);
+      }
+
+      return a.name.compareTo(b.name);
+    });
+
     return ListView.builder(
       padding: const EdgeInsets.only(bottom: 100),
       itemCount: categories.length,
@@ -372,105 +414,174 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final category = categories[index];
         final items = groupedItems[category]!;
 
-        if (items.isEmpty) {
-          return const SizedBox.shrink();
-        }
-
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 6),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildCategoryHeader(category, items),
-              const SizedBox(height: 10),
-              if (!_collapsedCategoryIds.contains(category.id))
-                ...items.map((item) => _buildItemCard(item)),
-              const SizedBox(height: 12),
-            ],
-          ),
-        );
+        return _buildCategoryCard(category, items);
       },
     );
   }
 
-  Widget _buildCategoryHeader(Category category, List<Item> items) {
-    final isCollapsed = _collapsedCategoryIds.contains(category.id);
-    final totalExpense = _calculateCategoryExpense(items);
+  Widget _buildCategoryCard(Category category, List<Item> items) {
+    final purchasedCount = items.where((e) => e.isPurchased).length;
+    final remainingCount = items.length - purchasedCount;
+
+    final totalExpense = items
+        .where((e) => e.isPurchased && e.purchasedPrice != null)
+        .fold<double>(0, (sum, item) => sum + item.purchasedPrice!);
+
+    final lastItem = items.isNotEmpty ? items.last : null;
 
     return GestureDetector(
       onTap: () {
-        setState(() {
-          if (isCollapsed) {
-            _collapsedCategoryIds.remove(category.id);
-          } else {
-            _collapsedCategoryIds.add(category.id);
-          }
-        });
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) =>
+                CategoryDetailScreen(category: category, items: items),
+          ),
+        );
       },
       child: Container(
-        margin: const EdgeInsets.only(top: 4, bottom: 2),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.78),
-          borderRadius: BorderRadius.circular(22),
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(28),
           border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFD96BA7).withValues(alpha: 0.08),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
+              color: const Color(0xFFD96BA7).withValues(alpha: 0.12),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
             ),
           ],
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFFC7E3), Color(0xFFFFEEF7)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+            Row(
+              children: [
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFC7E3), Color(0xFFFFEEF7)],
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Icon(
+                    _getCategoryIcon(category.name),
+                    color: const Color(0xFFD96BA7),
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(
-                _getCategoryIcon(category.name),
-                size: 20,
-                color: const Color(0xFFD96BA7),
-              ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        category.name,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF2C1E26),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${items.length} ürün',
+                        style: const TextStyle(
+                          color: Color(0xFF8A6B79),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFF8A6B79),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Expanded(
+
+            const SizedBox(height: 16),
+
+            Row(
+              children: [
+                _miniInfoCard(
+                  'Alınan',
+                  purchasedCount.toString(),
+                  const Color(0xFF7ACFA6),
+                ),
+                const SizedBox(width: 10),
+                _miniInfoCard(
+                  'Kalan',
+                  remainingCount.toString(),
+                  const Color(0xFFFFB74D),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 14),
+
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7FB),
+                borderRadius: BorderRadius.circular(18),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    category.name,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF2C1E26),
+                    'Toplam Harcama',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Text(
-                    '${items.length} ürün • ${totalExpense.toStringAsFixed(2)} ₺',
+                    '${totalExpense.toStringAsFixed(2)} ₺',
                     style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF8A6B79),
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFD96BA7),
                     ),
                   ),
                 ],
               ),
             ),
-            AnimatedRotation(
-              turns: isCollapsed ? -0.25 : 0,
-              duration: const Duration(milliseconds: 200),
-              child: const Icon(
-                Icons.keyboard_arrow_down_rounded,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _miniInfoCard(String title, String value, Color color) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: Color(0xFF2C1E26),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              title,
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
                 color: Color(0xFF8A6B79),
               ),
             ),
@@ -478,116 +589,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
     );
-  }
-
-  Widget _buildItemCard(Item item) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.90),
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.6)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFD96BA7).withValues(alpha: 0.13),
-            blurRadius: 26,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: item.imagePath != null && item.imagePath!.isNotEmpty
-                ? Image.file(
-                    File(item.imagePath!),
-                    width: 52,
-                    height: 52,
-                    fit: BoxFit.cover,
-                  )
-                : Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFFC7E3), Color(0xFFFFEEF7)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Icon(
-                      Icons.shopping_bag_outlined,
-                      color: Color(0xFFD96BA7),
-                    ),
-                  ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.name.trim().isEmpty ? 'İsimsiz Ürün' : item.name,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF2C1E26),
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  _buildItemSubtitle(item),
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: item.isPurchased
-                        ? const Color(0xFF2EAD5B)
-                        : const Color(0xFF8A6B79),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () async {
-              final repo = ref.read(itemRepositoryProvider);
-
-              await repo.togglePurchased(item);
-
-              ref.invalidate(allItemsProvider);
-            },
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 200),
-              transitionBuilder: (child, animation) {
-                return ScaleTransition(scale: animation, child: child);
-              },
-              child: Icon(
-                item.isPurchased
-                    ? Icons.check_circle
-                    : Icons.radio_button_unchecked,
-                key: ValueKey(item.isPurchased),
-                color: item.isPurchased
-                    ? const Color(0xFF2EAD5B)
-                    : const Color(0xFFC7A9B8),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _buildItemSubtitle(Item item) {
-    final status = item.isPurchased ? 'Alındı' : 'Alınmadı';
-
-    if (item.purchasedPrice == null) {
-      return status;
-    }
-
-    return '$status • ${item.purchasedPrice!.toStringAsFixed(2)} ₺';
   }
 
   IconData _getCategoryIcon(String categoryName) {
@@ -600,11 +601,5 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (name.contains('elektronik')) return Icons.devices_rounded;
 
     return Icons.category_rounded;
-  }
-
-  double _calculateCategoryExpense(List<Item> items) {
-    return items
-        .where((item) => item.isPurchased && item.purchasedPrice != null)
-        .fold<double>(0, (sum, item) => sum + item.purchasedPrice!);
   }
 }
