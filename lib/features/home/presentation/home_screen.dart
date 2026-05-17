@@ -45,23 +45,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => Center(child: Text('Hata: $error')),
               data: (_) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeader(),
-                    const SizedBox(height: 18),
-                    allItemsAsync.when(
-                      loading: () => _buildSummary([]),
-                      error: (_, __) => _buildSummary([]),
-                      data: (allItems) => _buildSummary(allItems),
-                    ),
-                    const SizedBox(height: 14),
-                    _buildRecentPurchasedCard(),
-                    const SizedBox(height: 16),
-                    _buildFilters(),
-                    const SizedBox(height: 16),
-                    Expanded(
-                      child: groupedItemsAsync.when(
+                return SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildHeader(),
+                      const SizedBox(height: 18),
+
+                      allItemsAsync.when(
+                        loading: () => _buildSummary([]),
+                        error: (_, __) => _buildSummary([]),
+                        data: (allItems) => _buildSummary(allItems),
+                      ),
+
+                      const SizedBox(height: 14),
+
+                      _buildRecentPurchasedCard(),
+
+                      const SizedBox(height: 16),
+
+                      _buildFilters(),
+
+                      const SizedBox(height: 16),
+
+                      groupedItemsAsync.when(
                         loading: () => const Center(
                           child: Padding(
                             padding: EdgeInsets.all(24),
@@ -76,8 +83,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           return _buildGroupedItemList(groupedItems);
                         },
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 );
               },
             ),
@@ -378,12 +385,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }).toList();
 
     if (categories.isEmpty) {
-      return const Center(
-        child: Text(
-          'Bu filtrede ürün yok',
-          style: TextStyle(
-            color: Color(0xFF8A6B79),
-            fontWeight: FontWeight.w600,
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 40),
+        child: Center(
+          child: Text(
+            'Bu filtrede ürün yok',
+            style: TextStyle(
+              color: Color(0xFF8A6B79),
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
       );
@@ -411,15 +421,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       return a.name.compareTo(b.name);
     });
 
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 100),
-      itemCount: categories.length,
-      itemBuilder: (context, index) {
-        final category = categories[index];
-        final items = groupedItems[category]!;
-
-        return _buildCategoryCard(category, items);
-      },
+    return Column(
+      children: [
+        ...categories.map((category) {
+          final items = groupedItems[category]!;
+          return _buildCategoryCard(category, items);
+        }),
+        const SizedBox(height: 100),
+      ],
     );
   }
 
