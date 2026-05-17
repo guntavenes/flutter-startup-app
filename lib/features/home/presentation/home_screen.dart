@@ -62,10 +62,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     const SizedBox(height: 16),
                     Expanded(
                       child: groupedItemsAsync.when(
-                        loading: () =>
-                            const Center(child: CircularProgressIndicator()),
-                        error: (error, _) =>
-                            Center(child: Text('Hata: $error')),
+                        loading: () => const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: CircularProgressIndicator(),
+                          ),
+                        ),
+                        error: (error, _) => Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Center(child: Text('Hata: $error')),
+                        ),
                         data: (groupedItems) {
                           return _buildGroupedItemList(groupedItems);
                         },
