@@ -30,6 +30,24 @@ final itemsProvider = FutureProvider<List<Item>>((ref) async {
   }
 });
 
+final recentPurchasedItemsProvider = FutureProvider<List<Item>>((ref) async {
+  final items = await ref.watch(allItemsProvider.future);
+
+  final sevenDaysAgo = DateTime.now()
+      .subtract(const Duration(days: 7))
+      .millisecondsSinceEpoch;
+
+  final recentItems = items.where((item) {
+    return item.isPurchased && item.updateAt >= sevenDaysAgo;
+  }).toList();
+
+  recentItems.sort((a, b) {
+    return b.updateAt.compareTo(a.updateAt);
+  });
+
+  return recentItems;
+});
+
 final groupedItemsProvider = FutureProvider<Map<Category, List<Item>>>((
   ref,
 ) async {

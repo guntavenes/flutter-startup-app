@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
-import 'package:flutter_startup_app/features/items/data/item_providers.dart';
-import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
-import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
-import 'dart:io';
-import 'package:flutter_startup_app/features/items/presentation/item_detail_screen.dart';
 import 'package:flutter_startup_app/features/categories/presentation/category_detail_screen.dart';
+import 'package:flutter_startup_app/features/items/data/item_providers.dart';
+import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
+import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -16,8 +14,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  final Set<int> _collapsedCategoryIds = {};
-
   @override
   Widget build(BuildContext context) {
     final itemsAsync = ref.watch(itemsProvider);
@@ -59,6 +55,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       error: (_, __) => _buildSummary([]),
                       data: (allItems) => _buildSummary(allItems),
                     ),
+                    const SizedBox(height: 14),
+                    _buildRecentPurchasedCard(),
                     const SizedBox(height: 16),
                     _buildFilters(),
                     const SizedBox(height: 16),
@@ -601,5 +599,77 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (name.contains('elektronik')) return Icons.devices_rounded;
 
     return Icons.category_rounded;
+  }
+
+  Widget _buildRecentPurchasedCard() {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const RecentPurchasedScreen()),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFD96BA7).withValues(alpha: 0.10),
+              blurRadius: 22,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFD96BA7), Color(0xFFFF8DBA)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(
+                Icons.shopping_cart_checkout_rounded,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(width: 14),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Son Alınanlar',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF2C1E26),
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Son 7 günde aldığın ürünleri görüntüle',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF8A6B79),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF8A6B79)),
+          ],
+        ),
+      ),
+    );
   }
 }
