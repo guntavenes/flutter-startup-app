@@ -1,0 +1,232 @@
+import 'package:drift/drift.dart' show Value;
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_startup_app/core/database/app_database.dart';
+import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
+import 'package:flutter_startup_app/features/items/data/item_providers.dart';
+import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
+
+import '../domain/template_item.dart';
+
+class TemplatePreviewScreen extends ConsumerStatefulWidget {
+  const TemplatePreviewScreen({
+    super.key,
+    required this.title,
+    required this.items,
+  });
+
+  final String title;
+  final List<TemplateItem> items;
+
+  @override
+  ConsumerState<TemplatePreviewScreen> createState() =>
+      _TemplatePreviewScreenState();
+}
+
+class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
+  late List<TemplateItem> _selectedItems;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedItems = List.from(widget.items);
+  }
+
+  Future<void> _addSelectedItemsToList() async {
+    if (_selectedItems.isEmpty) {
+      return;
+    }
+
+    final categoryRepository = ref.read(categoryRepositoryProvider);
+    final itemRepository = ref.read(itemRepositoryProvider);
+
+    await categoryRepository.insertDefaultCategories();
+
+    final categories = await categoryRepository.getAll();
+    final existingItems = await itemRepository.getAllItems();
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    int addedCount = 0;
+    int skippedCount = 0;
+
+    for (final templateItem in _selectedItems) {
+      final category = categories.firstWhere(
+        (category) => category.name == templateItem.categoryName,
+      );
+
+      final alreadyExists = existingItems.any((item) {
+        return item.categoryId == category.id &&
+            item.name.trim().toLowerCase() ==
+                templateItem.name.trim().toLowerCase();
+      });
+
+      if (alreadyExists) {
+        skippedCount++;
+        continue;
+      }
+
+      await itemRepository.addItem(
+        ItemsCompanion.insert(
+          categoryId: category.id,
+          name: templateItem.name,
+          createdAt: now,
+          updateAt: now,
+        ),
+      );
+
+      addedCount++;
+    }
+
+    ref.invalidate(allItemsProvider);
+
+    if (!mounted) {
+      return;
+    }
+
+    Navigator.of(context).pop();
+    Navigator.of(context).pop();
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          '$addedCount ürün eklendi, $skippedCount ürün zaten vardı.',
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final groupedItems = <String, List<TemplateItem>>{};
+
+    for (final item in _selectedItems) {
+      groupedItems.putIfAbsent(item.categoryName, () => []);
+      groupedItems[item.categoryName]!.add(item);
+    }
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFFFF5FA),
+      appBar: AppBar(
+        title: Text(widget.title),
+        backgroundColor: const Color(0xFFFFF5FA),
+        elevation: 0,
+      ),
+      body: Column(
+        children: [
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
+              children: groupedItems.entries.map((entry) {
+                return _buildCategorySection(entry.key, entry.value);
+              }).toList(),
+            ),
+          ),
+          _buildBottomButton(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategorySection(String categoryName, List<TemplateItem> items) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            categoryName,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF2C1E26),
+            ),
+          ),
+          const SizedBox(height: 12),
+          ...items.map(_buildItemTile),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemTile(TemplateItem item) {
+    final isSelected = _selectedItems.contains(item);
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            _selectedItems.remove(item);
+          } else {
+            _selectedItems.add(item);
+          }
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFFFF0F7) : const Color(0xFFF9F9F9),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected ? const Color(0xFFD96BA7) : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected
+                  ? Icons.check_circle_rounded
+                  : Icons.radio_button_unchecked,
+              color: isSelected
+                  ? const Color(0xFFD96BA7)
+                  : const Color(0xFFBDBDBD),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                item.name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF2C1E26),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBottomButton() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
+      color: const Color(0xFFFFF5FA),
+      child: SizedBox(
+        width: double.infinity,
+        height: 54,
+        child: ElevatedButton.icon(
+          onPressed: _selectedItems.isEmpty ? null : _addSelectedItemsToList,
+          icon: const Icon(Icons.add_task_rounded),
+          label: Text('Listeme Ekle (${_selectedItems.length})'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFD96BA7),
+            foregroundColor: Colors.white,
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            textStyle: const TextStyle(
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
