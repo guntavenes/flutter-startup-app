@@ -10,7 +10,9 @@ import 'dart:io';
 import 'package:image_picker/image_picker.dart';
 
 class ItemFormScreen extends ConsumerStatefulWidget {
-  const ItemFormScreen({super.key});
+  const ItemFormScreen({super.key, this.item});
+
+  final Item? item;
 
   @override
   ConsumerState<ItemFormScreen> createState() => _ItemFormScreenState();
@@ -18,6 +20,7 @@ class ItemFormScreen extends ConsumerStatefulWidget {
 
 class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
   final _formKey = GlobalKey<FormState>();
+  bool get _isEditMode => widget.item != null;
 
   final _nameController = TextEditingController();
   final _brandController = TextEditingController();
@@ -46,34 +49,83 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
       return;
     }
 
+    final itemName = _nameController.text.trim();
+
+    if (itemName.isEmpty) {
+      return;
+    }
+
     final repository = ref.read(itemRepositoryProvider);
     final now = DateTime.now().millisecondsSinceEpoch;
 
     final priceText = _priceController.text.trim().replaceAll(',', '.');
     final price = double.tryParse(priceText);
 
-    await repository.addItem(
-      ItemsCompanion.insert(
-        categoryId: _selectedCategoryId!,
-        name: _nameController.text.trim(),
-        brand: Value(_emptyToNull(_brandController.text)),
-        model: Value(_emptyToNull(_modelController.text)),
-        purchasedPrice: Value(price),
-        link: Value(_emptyToNull(_linkController.text)),
-        note: Value(_emptyToNull(_noteController.text)),
-        imagePath: Value(_selectedImagePath),
-        isPurchased: Value(_isPurchased),
-        purchaseDate: _isPurchased ? Value(now) : const Value.absent(),
-        createdAt: now,
-        updateAt: now,
-      ),
-    );
+    if (_isEditMode) {
+      await repository.updateItemDetails(
+        id: widget.item!.id,
+        companion: ItemsCompanion(
+          categoryId: Value(_selectedCategoryId!),
+          name: Value(itemName),
+          brand: Value(_emptyToNull(_brandController.text)),
+          model: Value(_emptyToNull(_modelController.text)),
+          purchasedPrice: Value(price),
+          link: Value(_emptyToNull(_linkController.text)),
+          note: Value(_emptyToNull(_noteController.text)),
+          imagePath: Value(_selectedImagePath),
+          isPurchased: Value(_isPurchased),
+          purchaseDate: _isPurchased
+              ? Value(widget.item!.purchaseDate ?? now)
+              : const Value.absent(),
+          updateAt: Value(now),
+        ),
+      );
+    } else {
+      await repository.addItem(
+        ItemsCompanion.insert(
+          categoryId: _selectedCategoryId!,
+          name: itemName,
+          brand: Value(_emptyToNull(_brandController.text)),
+          model: Value(_emptyToNull(_modelController.text)),
+          purchasedPrice: Value(price),
+          link: Value(_emptyToNull(_linkController.text)),
+          note: Value(_emptyToNull(_noteController.text)),
+          imagePath: Value(_selectedImagePath),
+          isPurchased: Value(_isPurchased),
+          purchaseDate: _isPurchased ? Value(now) : const Value.absent(),
+          createdAt: now,
+          updateAt: now,
+        ),
+      );
+    }
 
     ref.invalidate(allItemsProvider);
 
     if (mounted) {
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    final item = widget.item;
+
+    if (item == null) {
+      return;
+    }
+
+    _nameController.text = item.name;
+    _brandController.text = item.brand ?? '';
+    _modelController.text = item.model ?? '';
+    _priceController.text = item.purchasedPrice?.toString() ?? '';
+    _linkController.text = item.link ?? '';
+    _noteController.text = item.note ?? '';
+
+    _isPurchased = item.isPurchased;
+    _selectedCategoryId = item.categoryId;
+    _selectedImagePath = item.imagePath;
   }
 
   String? _emptyToNull(String value) {
@@ -88,9 +140,23 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFFFF5FA),
       appBar: AppBar(
-        title: const Text('Ürün Ekle'),
-        backgroundColor: Colors.transparent,
+        title: Text(_isEditMode ? 'Ürün Düzenle' : 'Ürün Ekle'),
+        backgroundColor: const Color(0xFFFFF5FA),
         elevation: 0,
+        actions: _isEditMode
+            ? [
+                IconButton(
+                  onPressed: _saveItem,
+                  icon: const Icon(Icons.check_rounded),
+                  tooltip: 'Güncelle',
+                ),
+                IconButton(
+                  onPressed: _confirmDeleteItem,
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  tooltip: 'Sil',
+                ),
+              ]
+            : null,
       ),
       body: Container(
         decoration: const BoxDecoration(
@@ -163,7 +229,10 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                   const SizedBox(height: 16),
                   _buildPurchasedSwitch(),
                   const SizedBox(height: 24),
-                  _buildSaveButton(),
+                  if (!_isEditMode) ...[
+                    const SizedBox(height: 24),
+                    _buildSaveButton(),
+                  ],
                 ],
               ),
             ),
@@ -171,6 +240,52 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _confirmDeleteItem() async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Ürünü sil'),
+          content: const Text('Bu ürünü silmek istediğine emin misin?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+              child: const Text('Vazgeç'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: const Text(
+                'Sil',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldDelete != true) {
+      return;
+    }
+
+    final repository = ref.read(itemRepositoryProvider);
+
+    await repository.deleteItemById(widget.item!.id);
+
+    ref.invalidate(allItemsProvider);
+
+    if (mounted) {
+      Navigator.of(context).pop(true);
+    }
   }
 
   Widget _buildCategoryDropdown(List<Category> categories) {
@@ -342,25 +457,26 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
             ),
           ),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Yeni Ürün',
-                  style: TextStyle(
+                  _isEditMode ? 'Ürünü Düzenle' : 'Yeni Ürün',
+                  style: const TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w900,
                     color: Colors.white,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
-                  'Çeyiz listene yeni bir ihtiyaç veya alınan ürün ekle.',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white,
-                    height: 1.35,
+                  _isEditMode
+                      ? 'Ürün bilgilerini güncelle veya ürünü listenden kaldır.'
+                      : 'Çeyiz listene yeni bir ihtiyaç veya alınan ürün ekle.',
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -385,9 +501,9 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
             borderRadius: BorderRadius.circular(22),
           ),
         ),
-        child: const Text(
-          'Kaydet',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        child: Text(
+          _isEditMode ? 'Güncelle' : 'Kaydet',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
       ),
     );

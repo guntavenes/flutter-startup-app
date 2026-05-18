@@ -15,11 +15,16 @@ class ItemRepository {
     return _database.into(_database.items).insert(item);
   }
 
-  Future<bool> updateItem(ItemsCompanion item) {
-    return _database.update(_database.items).replace(item);
+  Future<int> updateItemDetails({
+    required int id,
+    required ItemsCompanion companion,
+  }) {
+    return (_database.update(
+      _database.items,
+    )..where((tbl) => tbl.id.equals(id))).write(companion);
   }
 
-  Future<int> deleteItem(int id) {
+  Future<int> deleteItemById(int id) {
     return (_database.delete(
       _database.items,
     )..where((tbl) => tbl.id.equals(id))).go();

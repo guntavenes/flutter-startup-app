@@ -1,10 +1,13 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
-import 'package:flutter_startup_app/features/items/presentation/item_detail_screen.dart';
+import 'package:flutter_startup_app/features/items/data/item_providers.dart';
+import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
+import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 
-class CategoryDetailScreen extends StatefulWidget {
+class CategoryDetailScreen extends ConsumerStatefulWidget {
   const CategoryDetailScreen({
     super.key,
     required this.category,
@@ -15,13 +18,20 @@ class CategoryDetailScreen extends StatefulWidget {
   final List<Item> items;
 
   @override
-  State<CategoryDetailScreen> createState() => _CategoryDetailScreenState();
+  ConsumerState<CategoryDetailScreen> createState() =>
+      _CategoryDetailScreenState();
 }
 
-class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
+class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   final TextEditingController _searchController = TextEditingController();
 
   String _searchText = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +47,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
       backgroundColor: const Color(0xFFFFF5FA),
       appBar: AppBar(
         title: Text(widget.category.name),
-        backgroundColor: Colors.transparent,
+        backgroundColor: const Color(0xFFFFF5FA),
         elevation: 0,
       ),
       body: Container(
@@ -53,30 +63,162 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
             children: [
               _buildSummaryHeader(),
               _buildSearchBar(),
-              const SizedBox(height: 14),
+              const SizedBox(height: 10),
               Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 90),
-                  itemCount: filteredItems.length,
-                  itemBuilder: (context, index) {
-                    final item = filteredItems[index];
-
-                    return GestureDetector(
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => ItemDetailScreen(item: item),
+                child: filteredItems.isEmpty
+                    ? const Center(
+                        child: Text(
+                          'Ürün bulunamadı',
+                          style: TextStyle(
+                            color: Color(0xFF8A6B79),
+                            fontWeight: FontWeight.w700,
                           ),
-                        );
-                      },
-                      child: _buildItemCard(item),
-                    );
-                  },
-                ),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 90),
+                        itemCount: filteredItems.length,
+                        itemBuilder: (context, index) {
+                          final item = filteredItems[index];
+
+                          return Dismissible(
+                            key: ValueKey(item.id),
+                            background: _buildSwipeBackground(
+                              color: const Color(0xFF7ACFA6),
+                              icon: Icons.check_circle_rounded,
+                              text: item.isPurchased
+                                  ? 'Alınmadı Yap'
+                                  : 'Alındı Yap',
+                              alignment: Alignment.centerLeft,
+                            ),
+                            secondaryBackground: _buildSwipeBackground(
+                              color: Colors.redAccent,
+                              icon: Icons.delete_outline_rounded,
+                              text: 'Sil',
+                              alignment: Alignment.centerRight,
+                            ),
+                            confirmDismiss: (direction) async {
+                              final repo = ref.read(itemRepositoryProvider);
+
+                              if (direction == DismissDirection.startToEnd) {
+                                await repo.togglePurchased(item);
+                                ref.invalidate(allItemsProvider);
+                                setState(() {});
+                                return false;
+                              }
+
+                              final shouldDelete = await _confirmDeleteItem();
+
+                              if (shouldDelete == true) {
+                                await repo.deleteItemById(item.id);
+                                ref.invalidate(allItemsProvider);
+                                setState(() {});
+                                return true;
+                              }
+
+                              return false;
+                            },
+                            child: GestureDetector(
+                              onTap: () async {
+                                await Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => ItemFormScreen(item: item),
+                                  ),
+                                );
+
+                                ref.invalidate(allItemsProvider);
+                              },
+                              child: _buildItemCard(item),
+                            ),
+                          );
+                        },
+                      ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSummaryHeader() {
+    final purchasedCount = widget.items.where((e) => e.isPurchased).length;
+    final remainingCount = widget.items.length - purchasedCount;
+
+    final totalExpense = widget.items
+        .where((e) => e.isPurchased && e.purchasedPrice != null)
+        .fold<double>(0, (sum, item) => sum + item.purchasedPrice!);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF8DBA), Color(0xFFD96BA7)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD96BA7).withValues(alpha: 0.22),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            widget.category.name,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '${widget.items.length} ürün • '
+            '$purchasedCount alındı • '
+            '$remainingCount kalan',
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Toplam Harcama',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${totalExpense.toStringAsFixed(2)} ₺',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -121,92 +263,6 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     );
   }
 
-  Widget _buildSummaryHeader() {
-    final purchasedCount = widget.items.where((e) => e.isPurchased).length;
-    final remainingCount = widget.items.length - purchasedCount;
-
-    final totalExpense = widget.items
-        .where((e) => e.isPurchased && e.purchasedPrice != null)
-        .fold<double>(0, (sum, item) => sum + item.purchasedPrice!);
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFF8DBA), Color(0xFFD96BA7)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFD96BA7).withValues(alpha: 0.24),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            widget.category.name,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-              color: Colors.white,
-            ),
-          ),
-
-          const SizedBox(height: 8),
-
-          Text(
-            '${widget.items.length} ürün • '
-            '$purchasedCount alındı • '
-            '$remainingCount kalan',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-
-          const SizedBox(height: 18),
-
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(22),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Toplam Harcama',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  '${totalExpense.toStringAsFixed(2)} ₺',
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildItemCard(Item item) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -218,15 +274,15 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFD96BA7).withValues(alpha: 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Row(
         children: [
           ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
             child: item.imagePath != null && item.imagePath!.isNotEmpty
                 ? Image.file(
                     File(item.imagePath!),
@@ -235,39 +291,40 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
                     fit: BoxFit.cover,
                   )
                 : Container(
-                    width: 54,
-                    height: 54,
+                    width: 44,
+                    height: 44,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [Color(0xFFFFC7E3), Color(0xFFFFEEF7)],
                       ),
-                      borderRadius: BorderRadius.circular(20),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: const Icon(
                       Icons.shopping_bag_outlined,
                       color: Color(0xFFD96BA7),
+                      size: 22,
                     ),
                   ),
           ),
-          const SizedBox(width: 14),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  item.name,
+                  item.name.trim().isEmpty ? 'İsimsiz Ürün' : item.name,
                   style: const TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w900,
                     color: Color(0xFF2C1E26),
                   ),
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 4),
                 Text(
                   _buildSubtitle(item),
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
                     color: item.isPurchased
                         ? const Color(0xFF2EAD5B)
                         : const Color(0xFF8A6B79),
@@ -279,6 +336,71 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
           const Icon(Icons.chevron_right_rounded, color: Color(0xFF8A6B79)),
         ],
       ),
+    );
+  }
+
+  Widget _buildSwipeBackground({
+    required Color color,
+    required IconData icon,
+    required String text,
+    required Alignment alignment,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      alignment: alignment,
+      child: Row(
+        mainAxisAlignment: alignment == Alignment.centerLeft
+            ? MainAxisAlignment.start
+            : MainAxisAlignment.end,
+        children: [
+          Icon(icon, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(
+            text,
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<bool?> _confirmDeleteItem() {
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Ürünü sil'),
+          content: const Text('Bu ürünü silmek istediğine emin misin?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+              child: const Text('Vazgeç'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: const Text(
+                'Sil',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

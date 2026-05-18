@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
+import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 
 class ItemDetailScreen extends ConsumerStatefulWidget {
   const ItemDetailScreen({super.key, required this.item});
@@ -60,6 +61,8 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
               ),
               const SizedBox(height: 14),
               _buildPurchaseButton(context),
+              const SizedBox(height: 10),
+              _buildEditButton(context),
               const SizedBox(height: 14),
               _infoCard(
                 'Durum',
@@ -77,6 +80,36 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
               _infoCard('Not', _currentItem.note ?? '-'),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEditButton(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: OutlinedButton.icon(
+        onPressed: () async {
+          final result = await Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => ItemFormScreen(item: _currentItem),
+            ),
+          );
+
+          if (result == true && context.mounted) {
+            Navigator.of(context).pop();
+          }
+        },
+        icon: const Icon(Icons.edit_outlined),
+        label: const Text('Ürünü Düzenle'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: const Color(0xFFD96BA7),
+          side: const BorderSide(color: Color(0xFFD96BA7), width: 1.3),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          textStyle: const TextStyle(fontWeight: FontWeight.w800),
         ),
       ),
     );

@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
-import 'package:flutter_startup_app/features/items/presentation/item_detail_screen.dart';
+import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 
 class ItemListScreen extends StatelessWidget {
   const ItemListScreen({super.key, required this.title, required this.items});
@@ -28,7 +28,7 @@ class ItemListScreen extends StatelessWidget {
           return GestureDetector(
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => ItemDetailScreen(item: item)),
+                MaterialPageRoute(builder: (_) => ItemFormScreen(item: item)),
               );
             },
             child: Container(
