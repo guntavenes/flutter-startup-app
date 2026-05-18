@@ -86,7 +86,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     final categoriesAsync = ref.watch(categoriesProvider);
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: const Color(0xFFFFF5FA),
       appBar: AppBar(
         title: const Text('Ürün Ekle'),
         backgroundColor: Colors.transparent,

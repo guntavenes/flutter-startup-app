@@ -14,7 +14,7 @@ class RecentPurchasedScreen extends ConsumerWidget {
     final recentItemsAsync = ref.watch(recentPurchasedItemsProvider);
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: const Color(0xFFFFF5FA),
       appBar: AppBar(
         title: const Text('Son Alınanlar'),
         backgroundColor: Colors.transparent,

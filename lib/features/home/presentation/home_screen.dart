@@ -4,8 +4,8 @@ import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/features/categories/presentation/category_detail_screen.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
-import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_list_screen.dart';
+import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -22,7 +22,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final groupedItemsAsync = ref.watch(groupedItemsProvider);
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: const Color(0xFFFFF5FA),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.of(
@@ -466,8 +466,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final totalExpense = items
         .where((e) => e.isPurchased && e.purchasedPrice != null)
         .fold<double>(0, (sum, item) => sum + item.purchasedPrice!);
-
-    final lastItem = items.isNotEmpty ? items.last : null;
 
     return GestureDetector(
       onTap: () {

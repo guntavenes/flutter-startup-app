@@ -34,7 +34,7 @@ class _CategoryDetailScreenState extends State<CategoryDetailScreen> {
     }).toList();
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: const Color(0xFFFFF5FA),
       appBar: AppBar(
         title: Text(widget.category.name),
         backgroundColor: Colors.transparent,
