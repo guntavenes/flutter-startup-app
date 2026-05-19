@@ -30,7 +30,9 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
   @override
   void initState() {
     super.initState();
+
     _selectedItems = widget.items.toSet();
+
     _collapsedCategoryNames.addAll(
       widget.items.map((item) => item.categoryName).toSet(),
     );
@@ -130,9 +132,12 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
 
   Widget _buildCategorySection(String categoryName, List<TemplateItem> items) {
     final isCollapsed = _collapsedCategoryNames.contains(categoryName);
+
     final selectedCount = items.where((item) {
       return _selectedItems.contains(item);
     }).length;
+
+    final allSelected = selectedCount == items.length;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -164,16 +169,36 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
               padding: const EdgeInsets.all(14),
               child: Row(
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF0F7),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.category_rounded,
-                      color: Color(0xFFD96BA7),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        if (allSelected) {
+                          _selectedItems.removeAll(items);
+                        } else {
+                          _selectedItems.addAll(items);
+                        }
+                      });
+                    },
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: allSelected
+                            ? const Color(0xFFD96BA7)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: const Color(0xFFD96BA7),
+                          width: 2,
+                        ),
+                      ),
+                      child: allSelected
+                          ? const Icon(
+                              Icons.check_rounded,
+                              color: Colors.white,
+                              size: 18,
+                            )
+                          : null,
                     ),
                   ),
                   const SizedBox(width: 12),
