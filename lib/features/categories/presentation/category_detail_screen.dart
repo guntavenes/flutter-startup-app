@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
+import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
@@ -12,10 +13,12 @@ class CategoryDetailScreen extends ConsumerStatefulWidget {
     super.key,
     required this.category,
     required this.items,
+    required this.filter,
   });
 
   final Category category;
   final List<Item> items;
+  final ItemFilter filter;
 
   @override
   ConsumerState<CategoryDetailScreen> createState() =>
@@ -48,9 +51,24 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) => Center(child: Text('Hata: $error')),
         data: (allItems) {
-          final categoryItems = allItems
-              .where((item) => item.categoryId == widget.category.id)
-              .toList();
+          final categoryItems = allItems.where((item) {
+            final isSameCategory = item.categoryId == widget.category.id;
+
+            if (!isSameCategory) {
+              return false;
+            }
+
+            switch (widget.filter) {
+              case ItemFilter.remaining:
+                return !item.isPurchased;
+
+              case ItemFilter.purchased:
+                return item.isPurchased;
+
+              case ItemFilter.all:
+                return true;
+            }
+          }).toList();
 
           final filteredItems = categoryItems.where((item) {
             final query = _searchText.toLowerCase();
@@ -164,8 +182,8 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
     final remainingCount = items.length - purchasedCount;
 
     final totalExpense = items
-        .where((e) => e.isPurchased && e.purchasedPrice != null)
-        .fold<double>(0, (sum, item) => sum + item.purchasedPrice!);
+        .where((e) => e.isPurchased)
+        .fold<double>(0, (sum, item) => sum + (item.purchasedPrice ?? 0));
 
     return Container(
       margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
@@ -226,7 +244,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${totalExpense.toStringAsFixed(2)} ₺',
+                  totalExpense.toCurrency(),
                   style: const TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
@@ -425,10 +443,12 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   String _buildSubtitle(Item item) {
     final status = item.isPurchased ? 'Alındı' : 'Alınmadı';
 
-    if (item.purchasedPrice == null) {
+    if (!item.isPurchased) {
       return status;
     }
 
-    return '$status • ${item.purchasedPrice!.toStringAsFixed(2)} ₺';
+    final price = item.purchasedPrice ?? 0;
+
+    return '$status • ${price.toCurrency()}';
   }
 }

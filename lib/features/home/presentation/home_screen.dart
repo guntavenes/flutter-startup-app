@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
+import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
 import 'package:flutter_startup_app/features/categories/presentation/category_detail_screen.dart';
+import 'package:flutter_startup_app/features/expenses/presentation/expense_detail_screen.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_list_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
-import 'package:flutter_startup_app/features/templates/data/ceyiz_templates.dart';
 import 'package:flutter_startup_app/features/templates/data/ceyiz_templates.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
 
@@ -179,8 +180,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final remaining = total - purchased;
 
     final totalExpense = items
-        .where((e) => e.isPurchased && e.purchasedPrice != null)
-        .fold<double>(0, (sum, item) => sum + item.purchasedPrice!);
+        .where((e) => e.isPurchased)
+        .fold<double>(0, (sum, item) => sum + (item.purchasedPrice ?? 0));
 
     return Column(
       children: [
@@ -218,7 +219,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         ),
         const SizedBox(height: 10),
-        _expenseCard(totalExpense),
+        _expenseCard(totalExpense, items),
       ],
     );
   }
@@ -283,61 +284,69 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _expenseCard(double totalExpense) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFD96BA7), Color(0xFFFF8DBA)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+  Widget _expenseCard(double totalExpense, List<Item> items) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => ExpenseDetailScreen(items: items)),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [Color(0xFFD96BA7), Color(0xFFFF8DBA)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFD96BA7).withValues(alpha: 0.22),
+              blurRadius: 24,
+              offset: const Offset(0, 12),
+            ),
+          ],
         ),
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFD96BA7).withValues(alpha: 0.22),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.22),
-              borderRadius: BorderRadius.circular(18),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: const Icon(Icons.payments_outlined, color: Colors.white),
             ),
-            child: const Icon(Icons.payments_outlined, color: Colors.white),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Toplam Harcama',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w700,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Toplam Harcama',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${totalExpense.toStringAsFixed(2)} ₺',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
+                  const SizedBox(height: 4),
+                  Text(
+                    totalExpense.toCurrency(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+            const Icon(Icons.chevron_right_rounded, color: Colors.white),
+          ],
+        ),
       ),
     );
   }
@@ -479,12 +488,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Column(
       children: [
         ...categories.map((category) {
-          final items = groupedItems[category]!;
-          return _buildCategoryCard(category, items);
+          final allCategoryItems = groupedItems[category]!;
+          final visibleItems = _filterCategoryItems(allCategoryItems);
+
+          return _buildCategoryCard(category, visibleItems);
         }),
         const SizedBox(height: 100),
       ],
     );
+  }
+
+  List<Item> _filterCategoryItems(List<Item> items) {
+    final currentFilter = ref.read(itemFilterProvider);
+
+    switch (currentFilter) {
+      case ItemFilter.remaining:
+        return items.where((item) => !item.isPurchased).toList();
+
+      case ItemFilter.purchased:
+        return items.where((item) => item.isPurchased).toList();
+
+      case ItemFilter.all:
+        return items;
+    }
   }
 
   Widget _buildEmptyState() {
@@ -522,19 +548,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildCategoryCard(Category category, List<Item> items) {
+    final currentFilter = ref.watch(itemFilterProvider);
+
     final purchasedCount = items.where((e) => e.isPurchased).length;
     final remainingCount = items.length - purchasedCount;
 
     final totalExpense = items
-        .where((e) => e.isPurchased && e.purchasedPrice != null)
-        .fold<double>(0, (sum, item) => sum + item.purchasedPrice!);
+        .where((e) => e.isPurchased)
+        .fold<double>(0, (sum, item) => sum + (item.purchasedPrice ?? 0));
+
+    final lastItem = items.isNotEmpty ? items.last : null;
 
     return GestureDetector(
       onTap: () async {
         final result = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
-            builder: (_) =>
-                CategoryDetailScreen(category: category, items: items),
+            builder: (_) => CategoryDetailScreen(
+              category: category,
+              items: items,
+              filter: currentFilter,
+            ),
           ),
         );
 
@@ -574,9 +607,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   child: Icon(
                     _getCategoryIcon(category.name),
                     color: const Color(0xFFD96BA7),
+                    size: 22,
                   ),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -589,10 +623,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                           color: Color(0xFF2C1E26),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 3),
                       Text(
                         '${items.length} ürün',
                         style: const TextStyle(
+                          fontSize: 12,
                           color: Color(0xFF8A6B79),
                           fontWeight: FontWeight.w700,
                         ),
@@ -607,57 +642,106 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
-            Row(
-              children: [
-                _miniInfoCard(
-                  'Alınan',
-                  purchasedCount.toString(),
-                  const Color(0xFF7ACFA6),
-                ),
-                const SizedBox(width: 10),
-                _miniInfoCard(
-                  'Kalan',
-                  remainingCount.toString(),
-                  const Color(0xFFFFB74D),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 14),
-
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF7FB),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            if (currentFilter == ItemFilter.all) ...[
+              Row(
                 children: [
-                  Text(
-                    'Toplam Harcama',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w700,
-                    ),
+                  _miniInfoCard(
+                    'Alınan',
+                    purchasedCount.toString(),
+                    const Color(0xFF7ACFA6),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${totalExpense.toStringAsFixed(2)} ₺',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFD96BA7),
-                    ),
+                  const SizedBox(width: 10),
+                  _miniInfoCard(
+                    'Kalan',
+                    remainingCount.toString(),
+                    const Color(0xFFFFB74D),
                   ),
                 ],
               ),
-            ),
+              const SizedBox(height: 12),
+            ] else if (currentFilter == ItemFilter.remaining) ...[
+              _singleInfoCard(
+                'Kalan Ürün',
+                items.length.toString(),
+                const Color(0xFFFFB74D),
+              ),
+              const SizedBox(height: 12),
+            ] else if (currentFilter == ItemFilter.purchased) ...[
+              _singleInfoCard(
+                'Alınan Ürün',
+                items.length.toString(),
+                const Color(0xFF7ACFA6),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            if (currentFilter != ItemFilter.remaining)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF7FB),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Toplam Harcama',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      totalExpense.toCurrency(),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFD96BA7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _singleInfoCard(String title, String value, Color color) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF2C1E26),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF8A6B79),
+            ),
+          ),
+        ],
       ),
     );
   }

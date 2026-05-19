@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
+import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
@@ -74,7 +75,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                 'Fiyat',
                 _currentItem.purchasedPrice == null
                     ? '-'
-                    : '${_currentItem.purchasedPrice!.toStringAsFixed(2)} ₺',
+                    : (_currentItem.purchasedPrice ?? 0).toCurrency(),
               ),
               _infoCard('Link', _currentItem.link ?? '-'),
               _infoCard('Not', _currentItem.note ?? '-'),
