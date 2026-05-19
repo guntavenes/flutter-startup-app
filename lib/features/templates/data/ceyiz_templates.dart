@@ -1,53 +1,91 @@
 import '../domain/template_item.dart';
 
 class CeyizTemplates {
-  static const String basic = 'Basic';
-  static const String standard = 'Standart';
-  static const String premium = 'Premium';
+  static const String title = 'Hazır Çeyiz Listesi';
 
-  static final List<TemplateItem> basicItems = [
+  static final List<TemplateItem> items = [
     // Mutfak
-    TemplateItem(categoryName: 'Mutfak', name: 'Tencere seti'),
-    TemplateItem(categoryName: 'Mutfak', name: 'Çatal kaşık bıçak seti'),
-    TemplateItem(categoryName: 'Mutfak', name: 'Tabak seti'),
-    TemplateItem(categoryName: 'Mutfak', name: 'Bardak seti'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Günlük Yemek Takımı'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Misafir Yemek Takımı'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Kahvaltı Takımı'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Pasta Seti'),
+    TemplateItem(
+      categoryName: 'Mutfak',
+      name: 'Günlük Çatal Kaşık Bıçak Takımı',
+    ),
+    TemplateItem(categoryName: 'Mutfak', name: 'Misafirlik Kaşık Bıçak Takımı'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Çelik Tencere Seti'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Granit Tencere Seti'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Düdüklü Tencere'),
     TemplateItem(categoryName: 'Mutfak', name: 'Çaydanlık'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Cezve Seti'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Sahan Seti'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Krep Tavası'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Kızartma Tenceresi'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Sos Tenceresi'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Kepçe Takımı'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Silikon Pişirme Seti'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Bıçak Seti - Soyacak'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Meyve Bıçağı'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Sürahi'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Su Seti'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Su Bardağı'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Çay Takımı'),
+    TemplateItem(categoryName: 'Mutfak', name: 'Kahve Fincan Takımı'),
 
     // Yatak Odası
-    TemplateItem(categoryName: 'Yatak Odası', name: 'Nevresim takımı'),
-    TemplateItem(categoryName: 'Yatak Odası', name: 'Yorgan'),
+    TemplateItem(
+      categoryName: 'Yatak Odası',
+      name: 'Çift Kişilik Nevresim Takımı',
+    ),
+    TemplateItem(categoryName: 'Yatak Odası', name: 'Çift Kişilik Battaniye'),
+    TemplateItem(categoryName: 'Yatak Odası', name: 'Çift Kişilik Yorgan'),
+    TemplateItem(
+      categoryName: 'Yatak Odası',
+      name: 'Tek Kişilik Nevresim Takımı',
+    ),
+    TemplateItem(categoryName: 'Yatak Odası', name: 'Tek Kişilik Yorgan'),
+    TemplateItem(categoryName: 'Yatak Odası', name: 'Yatak Örtüsü'),
     TemplateItem(categoryName: 'Yatak Odası', name: 'Yastık'),
+    TemplateItem(categoryName: 'Yatak Odası', name: 'Alez'),
+    TemplateItem(categoryName: 'Yatak Odası', name: 'Ütü Masası'),
+    TemplateItem(categoryName: 'Yatak Odası', name: 'Çamaşır Kurutma Askısı'),
+    TemplateItem(categoryName: 'Yatak Odası', name: 'Askı'),
+    TemplateItem(categoryName: 'Yatak Odası', name: 'Çekmece Düzenleyici'),
 
     // Banyo
-    TemplateItem(categoryName: 'Banyo', name: 'Havlu seti'),
-    TemplateItem(categoryName: 'Banyo', name: 'Bornoz seti'),
-  ];
+    TemplateItem(categoryName: 'Banyo', name: 'Paspas Takımı'),
+    TemplateItem(categoryName: 'Banyo', name: 'Banyo Seti'),
+    TemplateItem(categoryName: 'Banyo', name: 'Çöp Kovası'),
+    TemplateItem(categoryName: 'Banyo', name: 'Kirli Çamaşır Sepeti'),
+    TemplateItem(categoryName: 'Banyo', name: 'Bornoz Takımı'),
+    TemplateItem(categoryName: 'Banyo', name: 'Havlu'),
+    TemplateItem(categoryName: 'Banyo', name: 'Vileda'),
+    TemplateItem(categoryName: 'Banyo', name: 'Mop'),
+    TemplateItem(categoryName: 'Banyo', name: 'Kişisel Bakım Cihazları'),
+    TemplateItem(categoryName: 'Banyo', name: 'El Yüz Havlusu'),
+    TemplateItem(categoryName: 'Banyo', name: 'Misafir Havlusu'),
+    TemplateItem(categoryName: 'Banyo', name: 'Ayak Havlusu'),
 
-  static final List<TemplateItem> standardItems = [
-    ...basicItems,
-
-    TemplateItem(categoryName: 'Mutfak', name: 'Blender seti'),
-    TemplateItem(categoryName: 'Mutfak', name: 'Kahvaltı takımı'),
-    TemplateItem(categoryName: 'Mutfak', name: 'Saklama kabı seti'),
-
-    TemplateItem(categoryName: 'Salon', name: 'Dekoratif yastık'),
-    TemplateItem(categoryName: 'Salon', name: 'Halı'),
-
-    TemplateItem(categoryName: 'Banyo', name: 'Çamaşır sepeti'),
-  ];
-
-  static final List<TemplateItem> premiumItems = [
-    ...standardItems,
-
-    TemplateItem(categoryName: 'Mutfak', name: 'Airfryer'),
-    TemplateItem(categoryName: 'Mutfak', name: 'Kahve makinesi'),
-    TemplateItem(categoryName: 'Mutfak', name: 'Stand mikser'),
-
-    TemplateItem(categoryName: 'Salon', name: 'Robot süpürge'),
-    TemplateItem(categoryName: 'Salon', name: 'Dekoratif ayna'),
-
-    TemplateItem(categoryName: 'Yatak Odası', name: 'Yedek nevresim seti'),
-
-    TemplateItem(categoryName: 'Banyo', name: 'Organizer seti'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Elektrikli Süpürge'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Robot Süpürge'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Ütü'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Saç Kurutma Makinası'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Airfry'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Çay Makinası'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Kettle'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Mikser-Blender Set'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Tost Makinası'),
+    TemplateItem(
+      categoryName: 'Elektronikler',
+      name: 'Ekmek Kızartma Makinası',
+    ),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Waffle Makinası'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Kahve Makinası'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Katı Meyve Sıkacağı'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Mikrodalga Fırın'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Smoothie Blender'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Mutfak Tartısı'),
+    TemplateItem(categoryName: 'Elektronikler', name: 'Hamur Yoğurma Makinası'),
   ];
 }

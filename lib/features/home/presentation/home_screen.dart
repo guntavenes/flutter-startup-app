@@ -6,7 +6,9 @@ import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_list_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
-import 'package:flutter_startup_app/features/templates/presentation/template_selection_screen.dart';
+import 'package:flutter_startup_app/features/templates/data/ceyiz_templates.dart';
+import 'package:flutter_startup_app/features/templates/data/ceyiz_templates.dart';
+import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -68,7 +70,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                       _buildTemplateCard(),
 
-                       const SizedBox(height: 16),     
+                      const SizedBox(height: 16),
 
                       _buildFilters(),
 
@@ -473,13 +475,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         .fold<double>(0, (sum, item) => sum + item.purchasedPrice!);
 
     return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
+      onTap: () async {
+        final result = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
             builder: (_) =>
                 CategoryDetailScreen(category: category, items: items),
           ),
         );
+
+        if (result == true) {
+          ref.invalidate(allItemsProvider);
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(bottom: 10),
@@ -722,7 +728,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return GestureDetector(
       onTap: () {
         Navigator.of(context).push(
-          MaterialPageRoute(builder: (_) => const TemplateSelectionScreen()),
+          MaterialPageRoute(
+            builder: (_) => TemplatePreviewScreen(
+              title: CeyizTemplates.title,
+              items: CeyizTemplates.items,
+            ),
+          ),
         );
       },
       child: Container(
@@ -764,7 +775,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Hazır Çeyiz Listeleri',
+                    'Hazır Çeyiz Şablonu',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
@@ -773,7 +784,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Basic, Standart veya Premium listeyle hızlı başla',
+                    'Hazır Liste İle Hemen Başla',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,

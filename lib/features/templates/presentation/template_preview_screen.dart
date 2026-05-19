@@ -24,12 +24,16 @@ class TemplatePreviewScreen extends ConsumerStatefulWidget {
 }
 
 class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
-  late List<TemplateItem> _selectedItems;
+  late Set<TemplateItem> _selectedItems;
+  final Set<String> _collapsedCategoryNames = {};
 
   @override
   void initState() {
     super.initState();
-    _selectedItems = List.from(widget.items);
+    _selectedItems = widget.items.toSet();
+    _collapsedCategoryNames.addAll(
+      widget.items.map((item) => item.categoryName).toSet(),
+    );
   }
 
   Future<void> _addSelectedItemsToList() async {
@@ -83,15 +87,12 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
       return;
     }
 
-    Navigator.of(context).pop();
+    final message = '$addedCount ürün eklendi, $skippedCount ürün zaten vardı.';
+
     Navigator.of(context).pop();
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          '$addedCount ürün eklendi, $skippedCount ürün zaten vardı.',
-        ),
-      ),
+      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
     );
   }
 
@@ -99,7 +100,7 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
   Widget build(BuildContext context) {
     final groupedItems = <String, List<TemplateItem>>{};
 
-    for (final item in _selectedItems) {
+    for (final item in widget.items) {
       groupedItems.putIfAbsent(item.categoryName, () => []);
       groupedItems[item.categoryName]!.add(item);
     }
@@ -128,26 +129,97 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
   }
 
   Widget _buildCategorySection(String categoryName, List<TemplateItem> items) {
+    final isCollapsed = _collapsedCategoryNames.contains(categoryName);
+    final selectedCount = items.where((item) {
+      return _selectedItems.contains(item);
+    }).length;
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 18),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFFFD6EA)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD96BA7).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            categoryName,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF2C1E26),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                if (isCollapsed) {
+                  _collapsedCategoryNames.remove(categoryName);
+                } else {
+                  _collapsedCategoryNames.add(categoryName);
+                }
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF0F7),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(
+                      Icons.category_rounded,
+                      color: Color(0xFFD96BA7),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          categoryName,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w900,
+                            color: Color(0xFF2C1E26),
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '$selectedCount/${items.length} seçili',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF8A6B79),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: isCollapsed ? -0.25 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Color(0xFF8A6B79),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 12),
-          ...items.map(_buildItemTile),
+          if (!isCollapsed) ...[
+            const Divider(height: 1),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+              child: Column(children: items.map(_buildItemTile).toList()),
+            ),
+          ],
         ],
       ),
     );

@@ -35,13 +35,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final filteredItems = widget.items.where((item) {
-      final query = _searchText.toLowerCase();
-
-      return item.name.toLowerCase().contains(query) ||
-          (item.brand?.toLowerCase().contains(query) ?? false) ||
-          (item.model?.toLowerCase().contains(query) ?? false);
-    }).toList();
+    final allItemsAsync = ref.watch(allItemsProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFF5FA),
@@ -50,102 +44,126 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         backgroundColor: const Color(0xFFFFF5FA),
         elevation: 0,
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFFFFF5FA), Color(0xFFFFF7F0)],
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-          ),
+      body: allItemsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(child: Text('Hata: $error')),
+        data: (allItems) {
+          final categoryItems = allItems
+              .where((item) => item.categoryId == widget.category.id)
+              .toList();
+
+          final filteredItems = categoryItems.where((item) {
+            final query = _searchText.toLowerCase();
+
+            return item.name.toLowerCase().contains(query) ||
+                (item.brand?.toLowerCase().contains(query) ?? false) ||
+                (item.model?.toLowerCase().contains(query) ?? false);
+          }).toList();
+
+          return _buildBody(filteredItems, categoryItems);
+        },
+      ),
+    );
+  }
+
+  Widget _buildBody(List<Item> filteredItems, List<Item> categoryItems) {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xFFFFF5FA), Color(0xFFFFF7F0)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
         ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              _buildSummaryHeader(),
-              _buildSearchBar(),
-              const SizedBox(height: 10),
-              Expanded(
-                child: filteredItems.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'Ürün bulunamadı',
-                          style: TextStyle(
-                            color: Color(0xFF8A6B79),
-                            fontWeight: FontWeight.w700,
-                          ),
+      ),
+      child: SafeArea(
+        child: Column(
+          children: [
+            _buildSummaryHeader(categoryItems),
+            _buildSearchBar(),
+            const SizedBox(height: 10),
+            Expanded(
+              child: filteredItems.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'Ürün bulunamadı',
+                        style: TextStyle(
+                          color: Color(0xFF8A6B79),
+                          fontWeight: FontWeight.w700,
                         ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(14, 0, 14, 90),
-                        itemCount: filteredItems.length,
-                        itemBuilder: (context, index) {
-                          final item = filteredItems[index];
-
-                          return Dismissible(
-                            key: ValueKey(item.id),
-                            background: _buildSwipeBackground(
-                              color: const Color(0xFF7ACFA6),
-                              icon: Icons.check_circle_rounded,
-                              text: item.isPurchased
-                                  ? 'Alınmadı Yap'
-                                  : 'Alındı Yap',
-                              alignment: Alignment.centerLeft,
-                            ),
-                            secondaryBackground: _buildSwipeBackground(
-                              color: Colors.redAccent,
-                              icon: Icons.delete_outline_rounded,
-                              text: 'Sil',
-                              alignment: Alignment.centerRight,
-                            ),
-                            confirmDismiss: (direction) async {
-                              final repo = ref.read(itemRepositoryProvider);
-
-                              if (direction == DismissDirection.startToEnd) {
-                                await repo.togglePurchased(item);
-                                ref.invalidate(allItemsProvider);
-                                setState(() {});
-                                return false;
-                              }
-
-                              final shouldDelete = await _confirmDeleteItem();
-
-                              if (shouldDelete == true) {
-                                await repo.deleteItemById(item.id);
-                                ref.invalidate(allItemsProvider);
-                                setState(() {});
-                                return true;
-                              }
-
-                              return false;
-                            },
-                            child: GestureDetector(
-                              onTap: () async {
-                                await Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => ItemFormScreen(item: item),
-                                  ),
-                                );
-
-                                ref.invalidate(allItemsProvider);
-                              },
-                              child: _buildItemCard(item),
-                            ),
-                          );
-                        },
                       ),
-              ),
-            ],
-          ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(14, 0, 14, 90),
+                      itemCount: filteredItems.length,
+                      itemBuilder: (context, index) {
+                        final item = filteredItems[index];
+
+                        return Dismissible(
+                          key: ValueKey(item.id),
+                          background: _buildSwipeBackground(
+                            color: const Color(0xFF7ACFA6),
+                            icon: Icons.check_circle_rounded,
+                            text: item.isPurchased
+                                ? 'Alınmadı Yap'
+                                : 'Alındı Yap',
+                            alignment: Alignment.centerLeft,
+                          ),
+                          secondaryBackground: _buildSwipeBackground(
+                            color: Colors.redAccent,
+                            icon: Icons.delete_outline_rounded,
+                            text: 'Sil',
+                            alignment: Alignment.centerRight,
+                          ),
+                          confirmDismiss: (direction) async {
+                            final repo = ref.read(itemRepositoryProvider);
+
+                            if (direction == DismissDirection.startToEnd) {
+                              await repo.togglePurchased(item);
+                              ref.invalidate(allItemsProvider);
+                              return false;
+                            }
+
+                            final shouldDelete = await _confirmDeleteItem();
+
+                            if (shouldDelete == true) {
+                              await repo.deleteItemById(item.id);
+                              ref.invalidate(allItemsProvider);
+                              return true;
+                            }
+
+                            return false;
+                          },
+                          child: GestureDetector(
+                            onTap: () async {
+                              final result = await Navigator.of(context)
+                                  .push<bool>(
+                                    MaterialPageRoute(
+                                      builder: (_) =>
+                                          ItemFormScreen(item: item),
+                                    ),
+                                  );
+
+                              if (result == true) {
+                                ref.invalidate(allItemsProvider);
+                              }
+                            },
+                            child: _buildItemCard(item),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildSummaryHeader() {
-    final purchasedCount = widget.items.where((e) => e.isPurchased).length;
-    final remainingCount = widget.items.length - purchasedCount;
+  Widget _buildSummaryHeader(List<Item> items) {
+    final purchasedCount = items.where((e) => e.isPurchased).length;
+    final remainingCount = items.length - purchasedCount;
 
-    final totalExpense = widget.items
+    final totalExpense = items
         .where((e) => e.isPurchased && e.purchasedPrice != null)
         .fold<double>(0, (sum, item) => sum + item.purchasedPrice!);
 
@@ -180,7 +198,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '${widget.items.length} ürün • '
+            '${items.length} ürün • '
             '$purchasedCount alındı • '
             '$remainingCount kalan',
             style: const TextStyle(
