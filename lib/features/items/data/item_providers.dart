@@ -51,7 +51,8 @@ final recentPurchasedItemsProvider = FutureProvider<List<Item>>((ref) async {
 final groupedItemsProvider = FutureProvider<Map<Category, List<Item>>>((
   ref,
 ) async {
-final items = await ref.watch(allItemsProvider.future);  final categories = await ref.watch(categoriesProvider.future);
+  final items = await ref.watch(allItemsProvider.future);
+  final categories = await ref.watch(categoriesProvider.future);
 
   final Map<Category, List<Item>> grouped = {};
 
@@ -61,7 +62,7 @@ final items = await ref.watch(allItemsProvider.future);  final categories = awai
 
   for (final item in items) {
     final category = categories.firstWhere(
-      (c) => c.id == item.categoryId,
+      (category) => category.id == item.categoryId,
       orElse: () => categories.first,
     );
 

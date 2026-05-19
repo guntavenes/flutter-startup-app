@@ -39,7 +39,20 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
   }
 
   Future<void> _addSelectedItemsToList() async {
+    debugPrint('_addSelectedItemsToList başladı');
+
     if (_selectedItems.isEmpty) {
+      debugPrint('Seçili item yok');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Listeye eklemek için en az bir ürün seçmelisin.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+
       return;
     }
 
@@ -58,6 +71,9 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
     for (final templateItem in _selectedItems) {
       final category = categories.firstWhere(
         (category) => category.name == templateItem.categoryName,
+        orElse: () {
+          throw Exception('Kategori bulunamadı: ${templateItem.categoryName}');
+        },
       );
 
       final alreadyExists = existingItems.any((item) {
@@ -83,19 +99,17 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
       addedCount++;
     }
 
+    debugPrint('Ekleme tamamlandı. added=$addedCount skipped=$skippedCount');
+
     ref.invalidate(allItemsProvider);
 
     if (!mounted) {
       return;
     }
 
-    final message = '$addedCount ürün eklendi, $skippedCount ürün zaten vardı.';
-
-    Navigator.of(context).pop();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
-    );
+    Navigator.of(
+      context,
+    ).pop({'addedCount': addedCount, 'skippedCount': skippedCount});
   }
 
   @override
@@ -307,7 +321,12 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
         width: double.infinity,
         height: 54,
         child: ElevatedButton.icon(
-          onPressed: _selectedItems.isEmpty ? null : _addSelectedItemsToList,
+          onPressed: () async {
+            debugPrint(
+              'Listeme Ekle tıklandı. Seçili: ${_selectedItems.length}',
+            );
+            await _addSelectedItemsToList();
+          },
           icon: const Icon(Icons.add_task_rounded),
           label: Text('Listeme Ekle (${_selectedItems.length})'),
           style: ElevatedButton.styleFrom(

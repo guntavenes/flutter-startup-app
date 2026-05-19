@@ -20,7 +20,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
-    final itemsAsync = ref.watch(itemsProvider);
     final allItemsAsync = ref.watch(allItemsProvider);
     final groupedItemsAsync = ref.watch(groupedItemsProvider);
 
@@ -45,56 +44,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 18, 14, 0),
-            child: itemsAsync.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (error, _) => Center(child: Text('Hata: $error')),
-              data: (_) {
-                return SingleChildScrollView(
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 18, 14, 0),
+                child: SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildHeader(),
                       const SizedBox(height: 14),
-
                       allItemsAsync.when(
                         loading: () => _buildSummary([]),
                         error: (_, __) => _buildSummary([]),
                         data: (allItems) => _buildSummary(allItems),
                       ),
-
-                      const SizedBox(height: 12),
-
+                      const SizedBox(height: 10),
                       _buildRecentPurchasedCard(),
-
                       const SizedBox(height: 10),
-
                       _buildTemplateCard(),
+                      const SizedBox(height: 12),
+                      allItemsAsync.when(
+                        loading: () => const SizedBox.shrink(),
+                        error: (_, __) => const SizedBox.shrink(),
+                        data: (allItems) {
+                          if (allItems.isEmpty) {
+                            return const SizedBox.shrink();
+                          }
 
-                      const SizedBox(height: 16),
-
-                      _buildFilters(),
-
-                      const SizedBox(height: 10),
-
+                          return Column(
+                            children: [
+                              _buildFilters(),
+                              const SizedBox(height: 12),
+                            ],
+                          );
+                        },
+                      ),
                       groupedItemsAsync.when(
-                        loading: () => const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24),
-                            child: CircularProgressIndicator(),
-                          ),
+                        loading: () => const Padding(
+                          padding: EdgeInsets.all(24),
+                          child: Center(child: CircularProgressIndicator()),
                         ),
                         error: (error, _) => Padding(
                           padding: const EdgeInsets.all(24),
                           child: Center(child: Text('Hata: $error')),
                         ),
                         data: (groupedItems) {
+                          final hasAnyItem = groupedItems.values.any(
+                            (items) => items.isNotEmpty,
+                          );
+
+                          if (!hasAnyItem) {
+                            return _buildEmptyState();
+                          }
+
                           return _buildGroupedItemList(groupedItems);
                         },
                       ),
                     ],
                   ),
-                );
-              },
+                ),
+              ),
             ),
           ),
         ),
@@ -340,6 +349,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       children: [
         GestureDetector(
           onTap: () {
+            if (current == ItemFilter.all) {
+              return;
+            }
+
             ref.read(itemFilterProvider.notifier).state = ItemFilter.all;
           },
           child: _filterChip('Tümü', current == ItemFilter.all),
@@ -347,6 +360,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         const SizedBox(width: 10),
         GestureDetector(
           onTap: () {
+            if (current == ItemFilter.remaining) {
+              return;
+            }
+
             ref.read(itemFilterProvider.notifier).state = ItemFilter.remaining;
           },
           child: _filterChip('Kalan', current == ItemFilter.remaining),
@@ -354,6 +371,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         const SizedBox(width: 10),
         GestureDetector(
           onTap: () {
+            if (current == ItemFilter.purchased) {
+              return;
+            }
+
             ref.read(itemFilterProvider.notifier).state = ItemFilter.purchased;
           },
           child: _filterChip('Alınan', current == ItemFilter.purchased),
@@ -463,6 +484,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         }),
         const SizedBox(height: 100),
       ],
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: Color(0xFFFFD6EA)),
+      ),
+      child: const Column(
+        children: [
+          Icon(Icons.inventory_2_outlined, color: Color(0xFFD96BA7), size: 34),
+          SizedBox(height: 10),
+          Text(
+            'Henüz ürün eklenmedi',
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF2C1E26),
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(
+            'Hazır çeyiz listesiyle başlayabilir veya + ile ürün ekleyebilirsin.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: Color(0xFF8A6B79),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -726,8 +781,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   Widget _buildTemplateCard() {
     return GestureDetector(
-      onTap: () {
-        Navigator.of(context).push(
+      onTap: () async {
+        final result = await Navigator.of(context).push<Map<String, int>>(
           MaterialPageRoute(
             builder: (_) => TemplatePreviewScreen(
               title: CeyizTemplates.title,
@@ -735,6 +790,28 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
         );
+
+        if (result == null) {
+          return;
+        }
+
+        ref.invalidate(allItemsProvider);
+
+        final addedCount = result['addedCount'] ?? 0;
+        final skippedCount = result['skippedCount'] ?? 0;
+
+        final message = addedCount > 0
+            ? '$addedCount ürün listene eklendi. $skippedCount ürün zaten vardı.'
+            : 'Seçili ürünler zaten listende vardı.';
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       },
       child: Container(
         width: double.infinity,
