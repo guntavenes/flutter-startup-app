@@ -1,9 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
+import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
@@ -28,7 +30,15 @@ class CategoryDetailScreen extends ConsumerStatefulWidget {
 class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   final TextEditingController _searchController = TextEditingController();
 
+  late List<Item> _categoryItems;
   String _searchText = '';
+  bool _hasChanges = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _categoryItems = widget.items;
+  }
 
   @override
   void dispose() {
@@ -36,9 +46,44 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
     super.dispose();
   }
 
+  Future<void> _reloadCategoryItemsFromDb() async {
+    final repo = ref.read(itemRepositoryProvider);
+    final allItems = await repo.getAllItems();
+
+    final refreshedItems = allItems.where((item) {
+      if (item.categoryId != widget.category.id) {
+        return false;
+      }
+
+      switch (widget.filter) {
+        case ItemFilter.remaining:
+          return !item.isPurchased;
+        case ItemFilter.purchased:
+          return item.isPurchased;
+        case ItemFilter.all:
+          return true;
+      }
+    }).toList();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _categoryItems = refreshedItems;
+      _hasChanges = true;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final allItemsAsync = ref.watch(allItemsProvider);
+    final filteredItems = _categoryItems.where((item) {
+      final query = _searchText.toLowerCase();
+
+      return item.name.toLowerCase().contains(query) ||
+          (item.brand?.toLowerCase().contains(query) ?? false) ||
+          (item.model?.toLowerCase().contains(query) ?? false);
+    }).toList();
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFF5FA),
@@ -46,41 +91,14 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         title: Text(widget.category.name),
         backgroundColor: const Color(0xFFFFF5FA),
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            Navigator.of(context).pop(_hasChanges);
+          },
+        ),
       ),
-      body: allItemsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Center(child: Text('Hata: $error')),
-        data: (allItems) {
-          final categoryItems = allItems.where((item) {
-            final isSameCategory = item.categoryId == widget.category.id;
-
-            if (!isSameCategory) {
-              return false;
-            }
-
-            switch (widget.filter) {
-              case ItemFilter.remaining:
-                return !item.isPurchased;
-
-              case ItemFilter.purchased:
-                return item.isPurchased;
-
-              case ItemFilter.all:
-                return true;
-            }
-          }).toList();
-
-          final filteredItems = categoryItems.where((item) {
-            final query = _searchText.toLowerCase();
-
-            return item.name.toLowerCase().contains(query) ||
-                (item.brand?.toLowerCase().contains(query) ?? false) ||
-                (item.model?.toLowerCase().contains(query) ?? false);
-          }).toList();
-
-          return _buildBody(filteredItems, categoryItems);
-        },
-      ),
+      body: _buildBody(filteredItems, _categoryItems),
     );
   }
 
@@ -116,57 +134,20 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                       itemBuilder: (context, index) {
                         final item = filteredItems[index];
 
-                        return Dismissible(
-                          key: ValueKey(item.id),
-                          background: _buildSwipeBackground(
-                            color: const Color(0xFF7ACFA6),
-                            icon: Icons.check_circle_rounded,
-                            text: item.isPurchased
-                                ? 'Alınmadı Yap'
-                                : 'Alındı Yap',
-                            alignment: Alignment.centerLeft,
-                          ),
-                          secondaryBackground: _buildSwipeBackground(
-                            color: Colors.redAccent,
-                            icon: Icons.delete_outline_rounded,
-                            text: 'Sil',
-                            alignment: Alignment.centerRight,
-                          ),
-                          confirmDismiss: (direction) async {
-                            final repo = ref.read(itemRepositoryProvider);
+                        return GestureDetector(
+                          onTap: () async {
+                            final result = await Navigator.of(context)
+                                .push<bool>(
+                                  MaterialPageRoute(
+                                    builder: (_) => ItemFormScreen(item: item),
+                                  ),
+                                );
 
-                            if (direction == DismissDirection.startToEnd) {
-                              await repo.togglePurchased(item);
-                              ref.invalidate(allItemsProvider);
-                              return false;
+                            if (result == true) {
+                              await _reloadCategoryItemsFromDb();
                             }
-
-                            final shouldDelete = await _confirmDeleteItem();
-
-                            if (shouldDelete == true) {
-                              await repo.deleteItemById(item.id);
-                              ref.invalidate(allItemsProvider);
-                              return true;
-                            }
-
-                            return false;
                           },
-                          child: GestureDetector(
-                            onTap: () async {
-                              final result = await Navigator.of(context)
-                                  .push<bool>(
-                                    MaterialPageRoute(
-                                      builder: (_) =>
-                                          ItemFormScreen(item: item),
-                                    ),
-                                  );
-
-                              if (result == true) {
-                                ref.invalidate(allItemsProvider);
-                              }
-                            },
-                            child: _buildItemCard(item),
-                          ),
+                          child: _buildItemCard(item),
                         );
                       },
                     ),
@@ -175,6 +156,50 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handlePurchaseAction(Item item) async {
+    final repo = ref.read(itemRepositoryProvider);
+
+    if (item.isPurchased) {
+      final shouldMarkAsNotPurchased = await _confirmMarkAsNotPurchased();
+
+      if (shouldMarkAsNotPurchased == true) {
+        await repo.markAsNotPurchased(item);
+        await _reloadCategoryItemsFromDb();
+      }
+
+      return;
+    }
+
+    final purchaseInfo = await _showPurchaseInfoDialog(item);
+
+    if (purchaseInfo == null) {
+      return;
+    }
+
+    await repo.markAsPurchased(
+      item: item,
+      price: purchaseInfo.price,
+      brand: purchaseInfo.brand,
+      purchaseDate: purchaseInfo.purchaseDate,
+    );
+
+    await _reloadCategoryItemsFromDb();
+  }
+
+  Future<void> _handleDeleteAction(Item item) async {
+    final shouldDelete = await _confirmDeleteItem();
+
+    if (shouldDelete != true) {
+      return;
+    }
+
+    final repo = ref.read(itemRepositoryProvider);
+
+    await repo.deleteItemById(item.id);
+
+    await _reloadCategoryItemsFromDb();
   }
 
   Widget _buildSummaryHeader(List<Item> items) {
@@ -369,41 +394,59 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: Color(0xFF8A6B79)),
+          const SizedBox(width: 8),
+          _buildPurchaseActionButton(item),
+          const SizedBox(width: 6),
+          _buildDeleteActionButton(item),
         ],
       ),
     );
   }
 
-  Widget _buildSwipeBackground({
-    required Color color,
-    required IconData icon,
-    required String text,
-    required Alignment alignment,
-  }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(22),
+  Widget _buildPurchaseActionButton(Item item) {
+    return GestureDetector(
+      onTap: () {
+        _handlePurchaseAction(item);
+      },
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: item.isPurchased
+              ? const Color(0xFFFFF3E0)
+              : const Color(0xFFEAF8F0),
+          borderRadius: BorderRadius.circular(13),
+        ),
+        child: Icon(
+          item.isPurchased
+              ? Icons.undo_rounded
+              : Icons.check_circle_outline_rounded,
+          color: item.isPurchased
+              ? const Color(0xFFFF9800)
+              : const Color(0xFF2EAD5B),
+          size: 20,
+        ),
       ),
-      alignment: alignment,
-      child: Row(
-        mainAxisAlignment: alignment == Alignment.centerLeft
-            ? MainAxisAlignment.start
-            : MainAxisAlignment.end,
-        children: [
-          Icon(icon, color: Colors.white),
-          const SizedBox(width: 8),
-          Text(
-            text,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
+    );
+  }
+
+  Widget _buildDeleteActionButton(Item item) {
+    return GestureDetector(
+      onTap: () {
+        _handleDeleteAction(item);
+      },
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFEBEE),
+          borderRadius: BorderRadius.circular(13),
+        ),
+        child: const Icon(
+          Icons.delete_outline_rounded,
+          color: Colors.redAccent,
+          size: 20,
+        ),
       ),
     );
   }
@@ -440,15 +483,206 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
     );
   }
 
-  String _buildSubtitle(Item item) {
-    final status = item.isPurchased ? 'Alındı' : 'Alınmadı';
+  Future<bool?> _confirmMarkAsNotPurchased() {
+    return showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Alınmadı yap'),
+          content: const Text(
+            'Bu ürünü alınmadı olarak işaretlemek istediğine emin misin?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+              child: const Text('Vazgeç'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: const Text(
+                'Alınmadı Yap',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
-    if (!item.isPurchased) {
-      return status;
+  Future<PurchaseInfoResult?> _showPurchaseInfoDialog(Item item) async {
+    final priceController = TextEditingController(
+      text: item.purchasedPrice?.toString() ?? '',
+    );
+
+    final brandController = TextEditingController(text: item.brand ?? '');
+
+    DateTime selectedDate = DateTime.now();
+
+    final result = await showDialog<PurchaseInfoResult>(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Satın Alma Bilgisi'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: priceController,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
+                    ],
+                    decoration: const InputDecoration(labelText: 'Fiyat'),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: brandController,
+                    textCapitalization: TextCapitalization.words,
+                    inputFormatters: [
+                      TextInputFormatter.withFunction((oldValue, newValue) {
+                        final text = newValue.text;
+
+                        if (text.isEmpty) {
+                          return newValue;
+                        }
+
+                        final formatted = text
+                            .split(' ')
+                            .map((word) {
+                              if (word.isEmpty) {
+                                return word;
+                              }
+
+                              final lower = word.toLowerCase();
+
+                              return lower[0].toUpperCase() +
+                                  lower.substring(1);
+                            })
+                            .join(' ');
+
+                        return TextEditingValue(
+                          text: formatted,
+                          selection: TextSelection.collapsed(
+                            offset: formatted.length,
+                          ),
+                        );
+                      }),
+                    ],
+                    decoration: const InputDecoration(labelText: 'Marka'),
+                  ),
+                  const SizedBox(height: 10),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Alınma Tarihi'),
+                    subtitle: Text(
+                      '${selectedDate.day}.${selectedDate.month}.${selectedDate.year}',
+                    ),
+                    trailing: const Icon(Icons.calendar_month_outlined),
+                    onTap: () async {
+                      final pickedDate = await showDatePicker(
+                        context: dialogContext,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now(),
+                      );
+
+                      if (pickedDate == null) {
+                        return;
+                      }
+
+                      setDialogState(() {
+                        selectedDate = pickedDate;
+                      });
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('Vazgeç'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    final priceText = priceController.text.trim().replaceAll(
+                      ',',
+                      '.',
+                    );
+
+                    final price = double.tryParse(priceText) ?? 0;
+
+                    Navigator.of(dialogContext).pop(
+                      PurchaseInfoResult(
+                        price: price,
+                        brand: _formatBrand(brandController.text),
+                        purchaseDate: selectedDate.millisecondsSinceEpoch,
+                      ),
+                    );
+                  },
+                  child: const Text('Kaydet'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    return result;
+  }
+
+  String? _formatBrand(String value) {
+    final trimmedValue = value.trim();
+
+    if (trimmedValue.isEmpty) {
+      return null;
     }
 
-    final price = item.purchasedPrice ?? 0;
-
-    return '$status • ${price.toCurrency()}';
+    return trimmedValue
+        .split(' ')
+        .where((word) => word.isNotEmpty)
+        .map((word) {
+          final lower = word.toLowerCase();
+          return lower[0].toUpperCase() + lower.substring(1);
+        })
+        .join(' ');
   }
+
+  String _buildSubtitle(Item item) {
+    if (item.isPurchased) {
+      final price = item.purchasedPrice ?? 0;
+      final dateText = item.purchaseDate.toShortDateText();
+
+      return 'Alındı • $dateText • ${price.toCurrency()}';
+    }
+
+    if (item.estimatedPurchaseDate != null) {
+      return 'Alınmadı • Hedef: ${item.estimatedPurchaseDate.toShortDateText()}';
+    }
+
+    return 'Alınmadı';
+  }
+}
+
+class PurchaseInfoResult {
+  const PurchaseInfoResult({
+    required this.price,
+    required this.brand,
+    required this.purchaseDate,
+  });
+
+  final double price;
+  final String? brand;
+  final int purchaseDate;
 }

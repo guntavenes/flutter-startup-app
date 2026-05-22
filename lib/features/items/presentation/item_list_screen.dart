@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
+import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
+import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
 
 class ItemListScreen extends StatelessWidget {
   const ItemListScreen({super.key, required this.title, required this.items});
@@ -78,7 +80,7 @@ class ItemListScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 5),
                         Text(
-                          item.isPurchased ? 'Alındı' : 'Alınmadı',
+                          _buildSubtitle(item),
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             color: item.isPurchased
@@ -100,5 +102,19 @@ class ItemListScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  String _buildSubtitle(Item item) {
+    if (item.isPurchased) {
+      final price = item.purchasedPrice ?? 0;
+
+      return 'Alındı • ${item.purchaseDate.toShortDateText()} • ${price.toCurrency()}';
+    }
+
+    if (item.estimatedPurchaseDate != null) {
+      return 'Alınmadı • Hedef: ${item.estimatedPurchaseDate.toShortDateText()}';
+    }
+
+    return 'Alınmadı';
   }
 }

@@ -6,6 +6,7 @@ import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
+import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
 
 class RecentPurchasedScreen extends ConsumerWidget {
   const RecentPurchasedScreen({super.key});
@@ -203,9 +204,7 @@ class RecentPurchasedScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  item.purchasedPrice == null
-                      ? 'Alındı'
-                      : (item.purchasedPrice ?? 0).toCurrency(),
+                  _buildSubtitle(item),
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
@@ -219,5 +218,12 @@ class RecentPurchasedScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  String _buildSubtitle(Item item) {
+    final price = item.purchasedPrice ?? 0;
+    final dateText = item.purchaseDate.toShortDateText();
+
+    return '$dateText • ${price.toCurrency()}';
   }
 }

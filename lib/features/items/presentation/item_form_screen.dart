@@ -1,12 +1,12 @@
+import 'dart:io';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
+import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
-import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
-import 'dart:io';
-
 import 'package:image_picker/image_picker.dart';
 
 class ItemFormScreen extends ConsumerStatefulWidget {
@@ -20,6 +20,7 @@ class ItemFormScreen extends ConsumerStatefulWidget {
 
 class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
   final _formKey = GlobalKey<FormState>();
+
   bool get _isEditMode => widget.item != null;
 
   final _nameController = TextEditingController();
@@ -32,6 +33,40 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
   bool _isPurchased = false;
   int? _selectedCategoryId;
   String? _selectedImagePath;
+  DateTime? _purchaseDate;
+  DateTime? _estimatedPurchaseDate;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final item = widget.item;
+
+    if (item == null) {
+      return;
+    }
+
+    _nameController.text = item.name;
+    _brandController.text = item.brand ?? '';
+    _modelController.text = item.model ?? '';
+    _priceController.text = item.purchasedPrice?.toString() ?? '';
+    _linkController.text = item.link ?? '';
+    _noteController.text = item.note ?? '';
+
+    _isPurchased = item.isPurchased;
+    _selectedCategoryId = item.categoryId;
+    _selectedImagePath = item.imagePath;
+
+    if (item.purchaseDate != null) {
+      _purchaseDate = DateTime.fromMillisecondsSinceEpoch(item.purchaseDate!);
+    }
+
+    if (item.estimatedPurchaseDate != null) {
+      _estimatedPurchaseDate = DateTime.fromMillisecondsSinceEpoch(
+        item.estimatedPurchaseDate!,
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -74,9 +109,10 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
           note: Value(_emptyToNull(_noteController.text)),
           imagePath: Value(_selectedImagePath),
           isPurchased: Value(_isPurchased),
-          purchaseDate: _isPurchased
-              ? Value(widget.item!.purchaseDate ?? now)
-              : const Value.absent(),
+          purchaseDate: Value(_purchaseDate?.millisecondsSinceEpoch),
+          estimatedPurchaseDate: Value(
+            _estimatedPurchaseDate?.millisecondsSinceEpoch,
+          ),
           updateAt: Value(now),
         ),
       );
@@ -92,7 +128,10 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
           note: Value(_emptyToNull(_noteController.text)),
           imagePath: Value(_selectedImagePath),
           isPurchased: Value(_isPurchased),
-          purchaseDate: _isPurchased ? Value(now) : const Value.absent(),
+          purchaseDate: Value(_purchaseDate?.millisecondsSinceEpoch),
+          estimatedPurchaseDate: Value(
+            _estimatedPurchaseDate?.millisecondsSinceEpoch,
+          ),
           createdAt: now,
           updateAt: now,
         ),
@@ -106,31 +145,72 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     }
   }
 
-  @override
-  void initState() {
-    super.initState();
+  Future<void> _confirmDeleteItem() async {
+    final shouldDelete = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Ürünü sil'),
+          content: const Text('Bu ürünü silmek istediğine emin misin?'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+              child: const Text('Vazgeç'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: const Text(
+                'Sil',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
 
-    final item = widget.item;
-
-    if (item == null) {
+    if (shouldDelete != true) {
       return;
     }
 
-    _nameController.text = item.name;
-    _brandController.text = item.brand ?? '';
-    _modelController.text = item.model ?? '';
-    _priceController.text = item.purchasedPrice?.toString() ?? '';
-    _linkController.text = item.link ?? '';
-    _noteController.text = item.note ?? '';
+    final repository = ref.read(itemRepositoryProvider);
 
-    _isPurchased = item.isPurchased;
-    _selectedCategoryId = item.categoryId;
-    _selectedImagePath = item.imagePath;
+    await repository.deleteItemById(widget.item!.id);
+
+    ref.invalidate(allItemsProvider);
+
+    if (mounted) {
+      Navigator.of(context).pop(true);
+    }
   }
 
   String? _emptyToNull(String value) {
     final trimmedValue = value.trim();
     return trimmedValue.isEmpty ? null : trimmedValue;
+  }
+
+  Future<DateTime?> _pickDate(DateTime? initialDate) {
+    return showDatePicker(
+      context: context,
+      initialDate: initialDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+  }
+
+  String _formatDate(DateTime? date) {
+    if (date == null) {
+      return 'Tarih seç';
+    }
+
+    return '${date.day}.${date.month}.${date.year}';
   }
 
   @override
@@ -183,7 +263,6 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                     icon: Icons.shopping_bag_outlined,
                     isRequired: true,
                   ),
-
                   const SizedBox(height: 14),
                   categoriesAsync.when(
                     loading: () =>
@@ -193,7 +272,6 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                       return _buildCategoryDropdown(categories);
                     },
                   ),
-
                   const SizedBox(height: 14),
                   _buildTextField(
                     controller: _brandController,
@@ -214,6 +292,42 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 14),
+                  _buildDatePickerTile(
+                    title: 'Alınma Tarihi',
+                    value: _purchaseDate,
+                    icon: Icons.event_available_outlined,
+                    onTap: () async {
+                      final selectedDate = await _pickDate(_purchaseDate);
+
+                      if (selectedDate == null) {
+                        return;
+                      }
+
+                      setState(() {
+                        _purchaseDate = selectedDate;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                  _buildDatePickerTile(
+                    title: 'Tahmini Alınma Tarihi',
+                    value: _estimatedPurchaseDate,
+                    icon: Icons.event_note_outlined,
+                    onTap: () async {
+                      final selectedDate = await _pickDate(
+                        _estimatedPurchaseDate,
+                      );
+
+                      if (selectedDate == null) {
+                        return;
+                      }
+
+                      setState(() {
+                        _estimatedPurchaseDate = selectedDate;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 14),
                   _buildTextField(
                     controller: _linkController,
                     label: 'Link',
@@ -228,7 +342,6 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                   ),
                   const SizedBox(height: 16),
                   _buildPurchasedSwitch(),
-                  const SizedBox(height: 24),
                   if (!_isEditMode) ...[
                     const SizedBox(height: 24),
                     _buildSaveButton(),
@@ -240,52 +353,6 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _confirmDeleteItem() async {
-    final shouldDelete = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: const Text('Ürünü sil'),
-          content: const Text('Bu ürünü silmek istediğine emin misin?'),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(false);
-              },
-              child: const Text('Vazgeç'),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(true);
-              },
-              child: const Text(
-                'Sil',
-                style: TextStyle(
-                  color: Colors.red,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (shouldDelete != true) {
-      return;
-    }
-
-    final repository = ref.read(itemRepositoryProvider);
-
-    await repository.deleteItemById(widget.item!.id);
-
-    ref.invalidate(allItemsProvider);
-
-    if (mounted) {
-      Navigator.of(context).pop(true);
-    }
   }
 
   Widget _buildCategoryDropdown(List<Category> categories) {
@@ -383,6 +450,56 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     );
   }
 
+  Widget _buildDatePickerTile({
+    required String title,
+    required DateTime? value,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFFD96BA7)),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Color(0xFF8A6B79),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _formatDate(value),
+                    style: const TextStyle(
+                      color: Color(0xFF2C1E26),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.calendar_month_outlined, color: Color(0xFF8A6B79)),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildPurchasedSwitch() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -404,6 +521,10 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
         onChanged: (value) {
           setState(() {
             _isPurchased = value;
+
+            if (value && _purchaseDate == null) {
+              _purchaseDate = DateTime.now();
+            }
           });
         },
         title: const Text(
@@ -509,12 +630,14 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     );
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
 
     final pickedFile = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 75,
+      source: source,
+      imageQuality: 70,
+      maxWidth: 1200,
+      maxHeight: 1200,
     );
 
     if (pickedFile == null) {
@@ -526,9 +649,68 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     });
   }
 
+  Future<void> _showImageSourceSheet() async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8C7D9),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(
+                    Icons.photo_library_outlined,
+                    color: Color(0xFFD96BA7),
+                  ),
+                  title: const Text(
+                    'Galeriden seç',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _pickImage(ImageSource.gallery);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(
+                    Icons.photo_camera_outlined,
+                    color: Color(0xFFD96BA7),
+                  ),
+                  title: const Text(
+                    'Kamera ile çek',
+                    style: TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    _pickImage(ImageSource.camera);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildImagePicker() {
     return GestureDetector(
-      onTap: _pickImage,
+      onTap: _showImageSourceSheet,
       child: Container(
         width: double.infinity,
         height: 150,
@@ -558,7 +740,12 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
               )
             : ClipRRect(
                 borderRadius: BorderRadius.circular(26),
-                child: Image.file(File(_selectedImagePath!), fit: BoxFit.cover),
+                child: Image.file(
+                  File(_selectedImagePath!),
+                  width: double.infinity,
+                  height: 150,
+                  fit: BoxFit.cover,
+                ),
               ),
       ),
     );

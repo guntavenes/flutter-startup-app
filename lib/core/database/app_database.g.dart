@@ -431,6 +431,16 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _estimatedPurchaseDateMeta =
+      const VerificationMeta('estimatedPurchaseDate');
+  @override
+  late final GeneratedColumn<int> estimatedPurchaseDate = GeneratedColumn<int>(
+    'estimated_purchase_date',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -449,6 +459,7 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     isPurchased,
     createdAt,
     updateAt,
+    estimatedPurchaseDate,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -578,6 +589,15 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
     } else if (isInserting) {
       context.missing(_updateAtMeta);
     }
+    if (data.containsKey('estimated_purchase_date')) {
+      context.handle(
+        _estimatedPurchaseDateMeta,
+        estimatedPurchaseDate.isAcceptableOrUnknown(
+          data['estimated_purchase_date']!,
+          _estimatedPurchaseDateMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -651,6 +671,10 @@ class $ItemsTable extends Items with TableInfo<$ItemsTable, Item> {
         DriftSqlType.int,
         data['${effectivePrefix}update_at'],
       )!,
+      estimatedPurchaseDate: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}estimated_purchase_date'],
+      ),
     );
   }
 
@@ -677,6 +701,7 @@ class Item extends DataClass implements Insertable<Item> {
   final bool isPurchased;
   final int createdAt;
   final int updateAt;
+  final int? estimatedPurchaseDate;
   const Item({
     required this.id,
     required this.categoryId,
@@ -694,6 +719,7 @@ class Item extends DataClass implements Insertable<Item> {
     required this.isPurchased,
     required this.createdAt,
     required this.updateAt,
+    this.estimatedPurchaseDate,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -734,6 +760,9 @@ class Item extends DataClass implements Insertable<Item> {
     map['is_purchased'] = Variable<bool>(isPurchased);
     map['created_at'] = Variable<int>(createdAt);
     map['update_at'] = Variable<int>(updateAt);
+    if (!nullToAbsent || estimatedPurchaseDate != null) {
+      map['estimated_purchase_date'] = Variable<int>(estimatedPurchaseDate);
+    }
     return map;
   }
 
@@ -771,6 +800,9 @@ class Item extends DataClass implements Insertable<Item> {
       isPurchased: Value(isPurchased),
       createdAt: Value(createdAt),
       updateAt: Value(updateAt),
+      estimatedPurchaseDate: estimatedPurchaseDate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(estimatedPurchaseDate),
     );
   }
 
@@ -796,6 +828,9 @@ class Item extends DataClass implements Insertable<Item> {
       isPurchased: serializer.fromJson<bool>(json['isPurchased']),
       createdAt: serializer.fromJson<int>(json['createdAt']),
       updateAt: serializer.fromJson<int>(json['updateAt']),
+      estimatedPurchaseDate: serializer.fromJson<int?>(
+        json['estimatedPurchaseDate'],
+      ),
     );
   }
   @override
@@ -818,6 +853,7 @@ class Item extends DataClass implements Insertable<Item> {
       'isPurchased': serializer.toJson<bool>(isPurchased),
       'createdAt': serializer.toJson<int>(createdAt),
       'updateAt': serializer.toJson<int>(updateAt),
+      'estimatedPurchaseDate': serializer.toJson<int?>(estimatedPurchaseDate),
     };
   }
 
@@ -838,6 +874,7 @@ class Item extends DataClass implements Insertable<Item> {
     bool? isPurchased,
     int? createdAt,
     int? updateAt,
+    Value<int?> estimatedPurchaseDate = const Value.absent(),
   }) => Item(
     id: id ?? this.id,
     categoryId: categoryId ?? this.categoryId,
@@ -859,6 +896,9 @@ class Item extends DataClass implements Insertable<Item> {
     isPurchased: isPurchased ?? this.isPurchased,
     createdAt: createdAt ?? this.createdAt,
     updateAt: updateAt ?? this.updateAt,
+    estimatedPurchaseDate: estimatedPurchaseDate.present
+        ? estimatedPurchaseDate.value
+        : this.estimatedPurchaseDate,
   );
   Item copyWithCompanion(ItemsCompanion data) {
     return Item(
@@ -890,6 +930,9 @@ class Item extends DataClass implements Insertable<Item> {
           : this.isPurchased,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       updateAt: data.updateAt.present ? data.updateAt.value : this.updateAt,
+      estimatedPurchaseDate: data.estimatedPurchaseDate.present
+          ? data.estimatedPurchaseDate.value
+          : this.estimatedPurchaseDate,
     );
   }
 
@@ -911,7 +954,8 @@ class Item extends DataClass implements Insertable<Item> {
           ..write('imagePath: $imagePath, ')
           ..write('isPurchased: $isPurchased, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updateAt: $updateAt')
+          ..write('updateAt: $updateAt, ')
+          ..write('estimatedPurchaseDate: $estimatedPurchaseDate')
           ..write(')'))
         .toString();
   }
@@ -934,6 +978,7 @@ class Item extends DataClass implements Insertable<Item> {
     isPurchased,
     createdAt,
     updateAt,
+    estimatedPurchaseDate,
   );
   @override
   bool operator ==(Object other) =>
@@ -954,7 +999,8 @@ class Item extends DataClass implements Insertable<Item> {
           other.imagePath == this.imagePath &&
           other.isPurchased == this.isPurchased &&
           other.createdAt == this.createdAt &&
-          other.updateAt == this.updateAt);
+          other.updateAt == this.updateAt &&
+          other.estimatedPurchaseDate == this.estimatedPurchaseDate);
 }
 
 class ItemsCompanion extends UpdateCompanion<Item> {
@@ -974,6 +1020,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
   final Value<bool> isPurchased;
   final Value<int> createdAt;
   final Value<int> updateAt;
+  final Value<int?> estimatedPurchaseDate;
   const ItemsCompanion({
     this.id = const Value.absent(),
     this.categoryId = const Value.absent(),
@@ -991,6 +1038,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.isPurchased = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updateAt = const Value.absent(),
+    this.estimatedPurchaseDate = const Value.absent(),
   });
   ItemsCompanion.insert({
     this.id = const Value.absent(),
@@ -1009,6 +1057,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     this.isPurchased = const Value.absent(),
     required int createdAt,
     required int updateAt,
+    this.estimatedPurchaseDate = const Value.absent(),
   }) : categoryId = Value(categoryId),
        name = Value(name),
        createdAt = Value(createdAt),
@@ -1030,6 +1079,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Expression<bool>? isPurchased,
     Expression<int>? createdAt,
     Expression<int>? updateAt,
+    Expression<int>? estimatedPurchaseDate,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1048,6 +1098,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       if (isPurchased != null) 'is_purchased': isPurchased,
       if (createdAt != null) 'created_at': createdAt,
       if (updateAt != null) 'update_at': updateAt,
+      if (estimatedPurchaseDate != null)
+        'estimated_purchase_date': estimatedPurchaseDate,
     });
   }
 
@@ -1068,6 +1120,7 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     Value<bool>? isPurchased,
     Value<int>? createdAt,
     Value<int>? updateAt,
+    Value<int?>? estimatedPurchaseDate,
   }) {
     return ItemsCompanion(
       id: id ?? this.id,
@@ -1086,6 +1139,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
       isPurchased: isPurchased ?? this.isPurchased,
       createdAt: createdAt ?? this.createdAt,
       updateAt: updateAt ?? this.updateAt,
+      estimatedPurchaseDate:
+          estimatedPurchaseDate ?? this.estimatedPurchaseDate,
     );
   }
 
@@ -1140,6 +1195,11 @@ class ItemsCompanion extends UpdateCompanion<Item> {
     if (updateAt.present) {
       map['update_at'] = Variable<int>(updateAt.value);
     }
+    if (estimatedPurchaseDate.present) {
+      map['estimated_purchase_date'] = Variable<int>(
+        estimatedPurchaseDate.value,
+      );
+    }
     return map;
   }
 
@@ -1161,7 +1221,8 @@ class ItemsCompanion extends UpdateCompanion<Item> {
           ..write('imagePath: $imagePath, ')
           ..write('isPurchased: $isPurchased, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updateAt: $updateAt')
+          ..write('updateAt: $updateAt, ')
+          ..write('estimatedPurchaseDate: $estimatedPurchaseDate')
           ..write(')'))
         .toString();
   }
@@ -1444,6 +1505,7 @@ typedef $$ItemsTableCreateCompanionBuilder =
       Value<bool> isPurchased,
       required int createdAt,
       required int updateAt,
+      Value<int?> estimatedPurchaseDate,
     });
 typedef $$ItemsTableUpdateCompanionBuilder =
     ItemsCompanion Function({
@@ -1463,6 +1525,7 @@ typedef $$ItemsTableUpdateCompanionBuilder =
       Value<bool> isPurchased,
       Value<int> createdAt,
       Value<int> updateAt,
+      Value<int?> estimatedPurchaseDate,
     });
 
 final class $$ItemsTableReferences
@@ -1567,6 +1630,11 @@ class $$ItemsTableFilterComposer extends Composer<_$AppDatabase, $ItemsTable> {
 
   ColumnFilters<int> get updateAt => $composableBuilder(
     column: $table.updateAt,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get estimatedPurchaseDate => $composableBuilder(
+    column: $table.estimatedPurchaseDate,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -1678,6 +1746,11 @@ class $$ItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get estimatedPurchaseDate => $composableBuilder(
+    column: $table.estimatedPurchaseDate,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$CategoriesTableOrderingComposer get categoryId {
     final $$CategoriesTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -1766,6 +1839,11 @@ class $$ItemsTableAnnotationComposer
   GeneratedColumn<int> get updateAt =>
       $composableBuilder(column: $table.updateAt, builder: (column) => column);
 
+  GeneratedColumn<int> get estimatedPurchaseDate => $composableBuilder(
+    column: $table.estimatedPurchaseDate,
+    builder: (column) => column,
+  );
+
   $$CategoriesTableAnnotationComposer get categoryId {
     final $$CategoriesTableAnnotationComposer composer = $composerBuilder(
       composer: this,
@@ -1834,6 +1912,7 @@ class $$ItemsTableTableManager
                 Value<bool> isPurchased = const Value.absent(),
                 Value<int> createdAt = const Value.absent(),
                 Value<int> updateAt = const Value.absent(),
+                Value<int?> estimatedPurchaseDate = const Value.absent(),
               }) => ItemsCompanion(
                 id: id,
                 categoryId: categoryId,
@@ -1851,6 +1930,7 @@ class $$ItemsTableTableManager
                 isPurchased: isPurchased,
                 createdAt: createdAt,
                 updateAt: updateAt,
+                estimatedPurchaseDate: estimatedPurchaseDate,
               ),
           createCompanionCallback:
               ({
@@ -1870,6 +1950,7 @@ class $$ItemsTableTableManager
                 Value<bool> isPurchased = const Value.absent(),
                 required int createdAt,
                 required int updateAt,
+                Value<int?> estimatedPurchaseDate = const Value.absent(),
               }) => ItemsCompanion.insert(
                 id: id,
                 categoryId: categoryId,
@@ -1887,6 +1968,7 @@ class $$ItemsTableTableManager
                 isPurchased: isPurchased,
                 createdAt: createdAt,
                 updateAt: updateAt,
+                estimatedPurchaseDate: estimatedPurchaseDate,
               ),
           withReferenceMapper: (p0) => p0
               .map(

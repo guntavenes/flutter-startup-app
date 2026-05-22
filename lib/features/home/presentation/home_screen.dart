@@ -10,6 +10,7 @@ import 'package:flutter_startup_app/features/items/presentation/item_list_screen
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
 import 'package:flutter_startup_app/features/templates/data/ceyiz_templates.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
+import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -178,6 +179,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final total = items.length;
     final purchased = items.where((e) => e.isPurchased).length;
     final remaining = total - purchased;
+    final upcomingItems = _getUpcomingItems(items);
 
     final totalExpense = items
         .where((e) => e.isPurchased)
@@ -220,7 +222,71 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         const SizedBox(height: 10),
         _expenseCard(totalExpense, items),
+        if (upcomingItems.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          _buildUpcomingCard(upcomingItems),
+        ],
       ],
+    );
+  }
+
+  Widget _buildUpcomingCard(List<Item> items) {
+    final firstItem = items.first;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFFFD59E)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.orange.withValues(alpha: 0.08),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFF3E0),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Icon(
+              Icons.notifications_active_outlined,
+              color: Color(0xFFFF9800),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${items.length} yaklaşan alım',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF2C1E26),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${firstItem.name} • ${firstItem.estimatedPurchaseDate.toShortDateText()}',
+                  style: const TextStyle(
+                    color: Color(0xFF8A6B79),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -450,7 +516,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     if (categories.isEmpty) {
       return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 40),
+        padding: EdgeInsets.symmetric(vertical: 28),
         child: Center(
           child: Text(
             'Bu filtrede ürün yok',
@@ -462,28 +528,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       );
     }
-
-    categories.sort((a, b) {
-      final aItems = groupedItems[a]!;
-      final bItems = groupedItems[b]!;
-
-      if (aItems.isEmpty && bItems.isNotEmpty) return 1;
-      if (bItems.isEmpty && aItems.isNotEmpty) return -1;
-
-      if (aItems.isNotEmpty && bItems.isNotEmpty) {
-        final aLast = aItems
-            .map((e) => e.createdAt)
-            .reduce((v, e) => v > e ? v : e);
-
-        final bLast = bItems
-            .map((e) => e.createdAt)
-            .reduce((v, e) => v > e ? v : e);
-
-        return bLast.compareTo(aLast);
-      }
-
-      return a.name.compareTo(b.name);
-    });
 
     return Column(
       children: [
@@ -510,6 +554,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
       case ItemFilter.all:
         return items;
+    }
+  }
+
+  Future<void> _openCategoryDetail(
+    Category category,
+    List<Item> items,
+    ItemFilter filter,
+  ) async {
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CategoryDetailScreen(
+          category: category,
+          items: items,
+          filter: filter,
+        ),
+      ),
+    );
+
+    if (result == true) {
+      ref.invalidate(allItemsProvider);
     }
   }
 
@@ -550,50 +614,40 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildCategoryCard(Category category, List<Item> items) {
     final currentFilter = ref.watch(itemFilterProvider);
 
-    final purchasedCount = items.where((e) => e.isPurchased).length;
-    final remainingCount = items.length - purchasedCount;
+    final purchasedItems = items.where((e) => e.isPurchased).toList();
+    final remainingItems = items.where((e) => !e.isPurchased).toList();
 
-    final totalExpense = items
-        .where((e) => e.isPurchased)
-        .fold<double>(0, (sum, item) => sum + (item.purchasedPrice ?? 0));
+    final purchasedCount = purchasedItems.length;
+    final remainingCount = remainingItems.length;
 
-    final lastItem = items.isNotEmpty ? items.last : null;
+    final totalExpense = purchasedItems.fold<double>(
+      0,
+      (sum, item) => sum + (item.purchasedPrice ?? 0),
+    );
 
-    return GestureDetector(
-      onTap: () async {
-        final result = await Navigator.of(context).push<bool>(
-          MaterialPageRoute(
-            builder: (_) => CategoryDetailScreen(
-              category: category,
-              items: items,
-              filter: currentFilter,
-            ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFFFD6EA), width: 1.1),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD96BA7).withValues(alpha: 0.16),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
-        );
-
-        if (result == true) {
-          ref.invalidate(allItemsProvider);
-        }
-      },
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: const Color(0xFFFFD6EA), width: 1.1),
-          boxShadow: [
-            BoxShadow(
-              color: const Color(0xFFD96BA7).withValues(alpha: 0.16),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          GestureDetector(
+            onTap: () {
+              _openCategoryDetail(category, items, currentFilter);
+            },
+            child: Row(
               children: [
                 Container(
                   width: 40,
@@ -641,125 +695,123 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ],
             ),
+          ),
+          const SizedBox(height: 12),
 
+          if (currentFilter == ItemFilter.all) ...[
+            Row(
+              children: [
+                _miniInfoCard(
+                  'Alınan',
+                  purchasedCount.toString(),
+                  const Color(0xFF7ACFA6),
+                  onTap: purchasedCount == 0
+                      ? null
+                      : () {
+                          _openCategoryDetail(
+                            category,
+                            purchasedItems,
+                            ItemFilter.purchased,
+                          );
+                        },
+                ),
+                const SizedBox(width: 10),
+                _miniInfoCard(
+                  'Kalan',
+                  remainingCount.toString(),
+                  const Color(0xFFFFB74D),
+                  onTap: remainingCount == 0
+                      ? null
+                      : () {
+                          _openCategoryDetail(
+                            category,
+                            remainingItems,
+                            ItemFilter.remaining,
+                          );
+                        },
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
+          ] else if (currentFilter == ItemFilter.remaining) ...[
+            _singleInfoCard(
+              'Kalan Ürün',
+              items.length.toString(),
+              const Color(0xFFFFB74D),
+              onTap: () {
+                _openCategoryDetail(category, items, ItemFilter.remaining);
+              },
+            ),
+            const SizedBox(height: 12),
+          ] else if (currentFilter == ItemFilter.purchased) ...[
+            _singleInfoCard(
+              'Alınan Ürün',
+              items.length.toString(),
+              const Color(0xFF7ACFA6),
+              onTap: () {
+                _openCategoryDetail(category, items, ItemFilter.purchased);
+              },
+            ),
+            const SizedBox(height: 12),
+          ],
 
-            if (currentFilter == ItemFilter.all) ...[
-              Row(
+          if (currentFilter != ItemFilter.remaining)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF7FB),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _miniInfoCard(
-                    'Alınan',
-                    purchasedCount.toString(),
-                    const Color(0xFF7ACFA6),
+                  Text(
+                    'Toplam Harcama',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
                   ),
-                  const SizedBox(width: 10),
-                  _miniInfoCard(
-                    'Kalan',
-                    remainingCount.toString(),
-                    const Color(0xFFFFB74D),
+                  const SizedBox(height: 4),
+                  Text(
+                    totalExpense.toCurrency(),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFD96BA7),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
-            ] else if (currentFilter == ItemFilter.remaining) ...[
-              _singleInfoCard(
-                'Kalan Ürün',
-                items.length.toString(),
-                const Color(0xFFFFB74D),
-              ),
-              const SizedBox(height: 12),
-            ] else if (currentFilter == ItemFilter.purchased) ...[
-              _singleInfoCard(
-                'Alınan Ürün',
-                items.length.toString(),
-                const Color(0xFF7ACFA6),
-              ),
-              const SizedBox(height: 12),
-            ],
-
-            if (currentFilter != ItemFilter.remaining)
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF7FB),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Toplam Harcama',
-                      style: TextStyle(
-                        color: Colors.grey.shade600,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      totalExpense.toCurrency(),
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFFD96BA7),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _singleInfoCard(String title, String value, Color color) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF2C1E26),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF8A6B79),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _miniInfoCard(String title, String value, Color color) {
-    return Expanded(
+  Widget _singleInfoCard(
+    String title,
+    String value,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.14),
-          borderRadius: BorderRadius.circular(15),
+          borderRadius: BorderRadius.circular(18),
         ),
         child: Column(
           children: [
             Text(
               value,
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.w900,
                 color: Color(0xFF2C1E26),
               ),
@@ -779,14 +831,69 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  Widget _miniInfoCard(
+    String title,
+    String value,
+    Color color, {
+    VoidCallback? onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: onTap == null ? 0.07 : 0.14),
+            borderRadius: BorderRadius.circular(15),
+          ),
+          child: Column(
+            children: [
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF2C1E26),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF8A6B79),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   IconData _getCategoryIcon(String categoryName) {
     final name = categoryName.toLowerCase();
 
-    if (name.contains('mutfak')) return Icons.restaurant_menu_rounded;
-    if (name.contains('yatak')) return Icons.bed_rounded;
-    if (name.contains('banyo')) return Icons.shower_rounded;
-    if (name.contains('salon')) return Icons.chair_rounded;
-    if (name.contains('elektronik')) return Icons.devices_rounded;
+    if (name.contains('mutfak')) {
+      return Icons.restaurant_menu_rounded;
+    }
+
+    if (name.contains('yatak')) {
+      return Icons.bed_rounded;
+    }
+
+    if (name.contains('banyo')) {
+      return Icons.shower_rounded;
+    }
+
+    if (name.contains('salon')) {
+      return Icons.chair_rounded;
+    }
+
+    if (name.contains('elektronik')) {
+      return Icons.devices_rounded;
+    }
 
     return Icons.category_rounded;
   }
@@ -960,5 +1067,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
     );
+  }
+
+  List<Item> _getUpcomingItems(List<Item> items) {
+    final now = DateTime.now();
+
+    return items.where((item) {
+      if (item.isPurchased) {
+        return false;
+      }
+
+      if (item.estimatedPurchaseDate == null) {
+        return false;
+      }
+
+      final estimatedDate = DateTime.fromMillisecondsSinceEpoch(
+        item.estimatedPurchaseDate!,
+      );
+
+      final diff = estimatedDate.difference(now).inDays;
+
+      return diff >= 0 && diff <= 7;
+    }).toList();
   }
 }

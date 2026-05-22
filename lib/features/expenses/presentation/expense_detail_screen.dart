@@ -5,6 +5,8 @@ import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
 import 'package:flutter_startup_app/features/expenses/domain/expense_sort_type.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
+import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
+import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
 
 class ExpenseDetailScreen extends StatefulWidget {
   const ExpenseDetailScreen({super.key, required this.items});
@@ -91,10 +93,18 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
 
     switch (_sortType) {
       case ExpenseSortType.dateDesc:
-        sortedItems.sort((a, b) => b.updateAt.compareTo(a.updateAt));
+        sortedItems.sort(
+          (a, b) => (b.purchaseDate ?? b.updateAt).compareTo(
+            a.purchaseDate ?? a.updateAt,
+          ),
+        );
         break;
       case ExpenseSortType.dateAsc:
-        sortedItems.sort((a, b) => a.updateAt.compareTo(b.updateAt));
+        sortedItems.sort(
+          (a, b) => (b.purchaseDate ?? b.updateAt).compareTo(
+            a.purchaseDate ?? a.updateAt,
+          ),
+        );
         break;
       case ExpenseSortType.priceDesc:
         sortedItems.sort(
@@ -269,13 +279,27 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              item.name.trim().isEmpty ? 'İsimsiz Ürün' : item.name,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF2C1E26),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.name.trim().isEmpty ? 'İsimsiz Ürün' : item.name,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF2C1E26),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.purchaseDate.toShortDateText(),
+                  style: const TextStyle(
+                    color: Color(0xFF8A6B79),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
           Text(
