@@ -73,6 +73,9 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
       _categoryItems = refreshedItems;
       _hasChanges = true;
     });
+
+    ref.invalidate(allItemsProvider);
+    ref.invalidate(groupedItemsProvider);
   }
 
   @override

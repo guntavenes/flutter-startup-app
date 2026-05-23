@@ -574,6 +574,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     if (result == true) {
       ref.invalidate(allItemsProvider);
+      ref.invalidate(groupedItemsProvider);
     }
   }
 
