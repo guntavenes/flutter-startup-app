@@ -6,9 +6,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
 import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
+import 'package:flutter_startup_app/features/brands/data/brand_options.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
+import 'package:flutter_startup_app/core/formatters/turkish_currency_input_formatter.dart';
 
 class CategoryDetailScreen extends ConsumerStatefulWidget {
   const CategoryDetailScreen({
@@ -65,9 +67,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
       }
     }).toList();
 
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
 
     setState(() {
       _categoryItems = refreshedItems;
@@ -174,9 +174,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
 
     final purchaseInfo = await _showPurchaseInfoDialog(item);
 
-    if (purchaseInfo == null) {
-      return;
-    }
+    if (purchaseInfo == null) return;
 
     await repo.markAsPurchased(
       item: item,
@@ -191,14 +189,11 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   Future<void> _handleDeleteAction(Item item) async {
     final shouldDelete = await _confirmDeleteItem();
 
-    if (shouldDelete != true) {
-      return;
-    }
+    if (shouldDelete != true) return;
 
     final repo = ref.read(itemRepositoryProvider);
 
     await repo.deleteItemById(item.id);
-
     await _reloadCategoryItemsFromDb();
   }
 
@@ -220,13 +215,6 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFD96BA7).withValues(alpha: 0.22),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,9 +229,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            '${items.length} ürün • '
-            '$purchasedCount alındı • '
-            '$remainingCount kalan',
+            '${items.length} ürün • $purchasedCount alındı • $remainingCount kalan',
             style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w700,
@@ -257,26 +243,13 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
               color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Toplam Harcama',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  totalExpense.toCurrency(),
-                  style: const TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
+            child: Text(
+              totalExpense.toCurrency(),
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
             ),
           ),
         ],
@@ -287,37 +260,24 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   Widget _buildSearchBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.92),
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: TextField(
-          controller: _searchController,
-          onChanged: (value) {
-            setState(() {
-              _searchText = value;
-            });
-          },
-          decoration: InputDecoration(
-            hintText: 'Ürün ara...',
-            prefixIcon: const Icon(
-              Icons.search_rounded,
-              color: Color(0xFFD96BA7),
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(22),
-              borderSide: BorderSide.none,
-            ),
-            filled: true,
-            fillColor: Colors.transparent,
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) {
+          setState(() {
+            _searchText = value;
+          });
+        },
+        decoration: InputDecoration(
+          hintText: 'Ürün ara...',
+          prefixIcon: const Icon(
+            Icons.search_rounded,
+            color: Color(0xFFD96BA7),
+          ),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.92),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(22),
+            borderSide: BorderSide.none,
           ),
         ),
       ),
@@ -331,14 +291,6 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFD96BA7).withValues(alpha: 0.12),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Row(
         children: [
@@ -460,15 +412,11 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
           content: const Text('Bu ürünü silmek istediğine emin misin?'),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(false);
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(false),
               child: const Text('Vazgeç'),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(true);
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(true),
               child: const Text(
                 'Sil',
                 style: TextStyle(
@@ -494,19 +442,12 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(false);
-              },
+              onPressed: () => Navigator.of(dialogContext).pop(false),
               child: const Text('Vazgeç'),
             ),
             TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop(true);
-              },
-              child: const Text(
-                'Alınmadı Yap',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Alınmadı Yap'),
             ),
           ],
         );
@@ -521,9 +462,19 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
 
     final brandController = TextEditingController(text: item.brand ?? '');
 
+    final brandOptions = BrandOptions.getBrands(widget.category.name);
+
+    String? selectedBrand = brandOptions.contains(item.brand)
+        ? item.brand
+        : null;
+
+    if (selectedBrand != BrandOptions.other) {
+      brandController.clear();
+    }
+
     DateTime selectedDate = DateTime.now();
 
-    final result = await showDialog<PurchaseInfoResult>(
+    return showDialog<PurchaseInfoResult>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -535,50 +486,53 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                 children: [
                   TextField(
                     controller: priceController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'[0-9,.]')),
-                    ],
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [TurkishCurrencyInputFormatter()],
                     decoration: const InputDecoration(labelText: 'Fiyat'),
                   ),
                   const SizedBox(height: 10),
-                  TextField(
-                    controller: brandController,
-                    textCapitalization: TextCapitalization.words,
-                    inputFormatters: [
-                      TextInputFormatter.withFunction((oldValue, newValue) {
-                        final text = newValue.text;
-
-                        if (text.isEmpty) {
-                          return newValue;
-                        }
-
-                        final formatted = text
-                            .split(' ')
-                            .map((word) {
-                              if (word.isEmpty) {
-                                return word;
-                              }
-
-                              final lower = word.toLowerCase();
-
-                              return lower[0].toUpperCase() +
-                                  lower.substring(1);
-                            })
-                            .join(' ');
-
-                        return TextEditingValue(
-                          text: formatted,
-                          selection: TextSelection.collapsed(
-                            offset: formatted.length,
-                          ),
-                        );
-                      }),
-                    ],
+                  DropdownButtonFormField<String>(
+                    value: selectedBrand,
+                    hint: const Text('Marka seçiniz'),
                     decoration: const InputDecoration(labelText: 'Marka'),
+                    items: brandOptions.map((brand) {
+                      return DropdownMenuItem<String>(
+                        value: brand,
+                        child: Text(brand),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      setDialogState(() {
+                        selectedBrand = value;
+
+                        if (selectedBrand != BrandOptions.other) {
+                          brandController.clear();
+                        }
+                      });
+                    },
                   ),
+                  if (selectedBrand == BrandOptions.other) ...[
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: brandController,
+                      textCapitalization: TextCapitalization.words,
+                      inputFormatters: [
+                        TextInputFormatter.withFunction((oldValue, newValue) {
+                          final formatted = _capitalizeWords(newValue.text);
+
+                          return TextEditingValue(
+                            text: formatted,
+                            selection: TextSelection.collapsed(
+                              offset: formatted.length,
+                            ),
+                          );
+                        }),
+                      ],
+                      decoration: const InputDecoration(
+                        labelText: 'Diğer Marka',
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 10),
                   ListTile(
                     contentPadding: EdgeInsets.zero,
@@ -595,9 +549,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                         lastDate: DateTime.now(),
                       );
 
-                      if (pickedDate == null) {
-                        return;
-                      }
+                      if (pickedDate == null) return;
 
                       setDialogState(() {
                         selectedDate = pickedDate;
@@ -608,24 +560,24 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
               ),
               actions: [
                 TextButton(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                  },
+                  onPressed: () => Navigator.of(dialogContext).pop(),
                   child: const Text('Vazgeç'),
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    final priceText = priceController.text.trim().replaceAll(
-                      ',',
-                      '.',
-                    );
+                    final priceText = priceController.text
+                        .trim()
+                        .replaceAll('.', '')
+                        .replaceAll(',', '.');
 
                     final price = double.tryParse(priceText) ?? 0;
 
                     Navigator.of(dialogContext).pop(
                       PurchaseInfoResult(
                         price: price,
-                        brand: _formatBrand(brandController.text),
+                        brand: selectedBrand == BrandOptions.other
+                            ? _formatBrand(brandController.text)
+                            : selectedBrand,
                         purchaseDate: selectedDate.millisecondsSinceEpoch,
                       ),
                     );
@@ -638,25 +590,28 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         );
       },
     );
-
-    return result;
   }
 
-  String? _formatBrand(String value) {
-    final trimmedValue = value.trim();
-
-    if (trimmedValue.isEmpty) {
-      return null;
-    }
-
-    return trimmedValue
+  String _capitalizeWords(String value) {
+    return value
         .split(' ')
-        .where((word) => word.isNotEmpty)
         .map((word) {
+          if (word.isEmpty) return word;
+
           final lower = word.toLowerCase();
           return lower[0].toUpperCase() + lower.substring(1);
         })
         .join(' ');
+  }
+
+  String? _formatBrand(String value) {
+    final formatted = _capitalizeWords(value.trim());
+
+    if (formatted.isEmpty) {
+      return null;
+    }
+
+    return formatted;
   }
 
   String _buildSubtitle(Item item) {

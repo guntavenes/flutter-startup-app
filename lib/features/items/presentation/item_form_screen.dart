@@ -2,12 +2,15 @@ import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_startup_app/features/brands/data/brand_options.dart';
+import 'package:flutter_startup_app/core/formatters/turkish_currency_input_formatter.dart';
 
 class ItemFormScreen extends ConsumerStatefulWidget {
   const ItemFormScreen({super.key, this.item});
@@ -35,6 +38,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
   String? _selectedImagePath;
   DateTime? _purchaseDate;
   DateTime? _estimatedPurchaseDate;
+  String? _selectedBrand;
 
   @override
   void initState() {
@@ -56,6 +60,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     _isPurchased = item.isPurchased;
     _selectedCategoryId = item.categoryId;
     _selectedImagePath = item.imagePath;
+    _selectedBrand = item.brand;
 
     if (item.purchaseDate != null) {
       _purchaseDate = DateTime.fromMillisecondsSinceEpoch(item.purchaseDate!);
@@ -93,7 +98,11 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     final repository = ref.read(itemRepositoryProvider);
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    final priceText = _priceController.text.trim().replaceAll(',', '.');
+    final priceText = _priceController.text
+        .trim()
+        .replaceAll('.', '')
+        .replaceAll(',', '.');
+
     final price = double.tryParse(priceText);
 
     if (_isEditMode) {
@@ -102,7 +111,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
         companion: ItemsCompanion(
           categoryId: Value(_selectedCategoryId!),
           name: Value(itemName),
-          brand: Value(_emptyToNull(_brandController.text)),
+          brand: Value(_getSelectedBrand()),
           model: Value(_emptyToNull(_modelController.text)),
           purchasedPrice: Value(price),
           link: Value(_emptyToNull(_linkController.text)),
@@ -121,7 +130,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
         ItemsCompanion.insert(
           categoryId: _selectedCategoryId!,
           name: itemName,
-          brand: Value(_emptyToNull(_brandController.text)),
+          brand: Value(_getSelectedBrand()),
           model: Value(_emptyToNull(_modelController.text)),
           purchasedPrice: Value(price),
           link: Value(_emptyToNull(_linkController.text)),
@@ -143,6 +152,18 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     if (mounted) {
       Navigator.of(context).pop(true);
     }
+  }
+
+  String? _getSelectedBrand() {
+    if (_selectedBrand == null) {
+      return null;
+    }
+
+    if (_selectedBrand != BrandOptions.other) {
+      return _selectedBrand;
+    }
+
+    return _emptyToNull(_brandController.text);
   }
 
   Future<void> _confirmDeleteItem() async {
@@ -273,10 +294,12 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                     },
                   ),
                   const SizedBox(height: 14),
-                  _buildTextField(
-                    controller: _brandController,
-                    label: 'Marka',
-                    icon: Icons.sell_outlined,
+                  categoriesAsync.when(
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                    data: (categories) {
+                      return _buildBrandSelector(categories);
+                    },
                   ),
                   const SizedBox(height: 14),
                   _buildTextField(
@@ -290,6 +313,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                     label: 'Fiyat',
                     icon: Icons.payments_outlined,
                     keyboardType: TextInputType.number,
+                    inputFormatters: [TurkishCurrencyInputFormatter()],
                   ),
                   const SizedBox(height: 14),
                   _buildDatePickerTile(
@@ -399,6 +423,8 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
       onChanged: (value) {
         setState(() {
           _selectedCategoryId = value;
+          _selectedBrand = null;
+          _brandController.clear();
         });
       },
     );
@@ -411,6 +437,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     bool isRequired = false,
     TextInputType? keyboardType,
     int maxLines = 1,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return TextFormField(
       controller: controller,
@@ -425,6 +452,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
               return null;
             }
           : null,
+      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: const Color(0xFFD96BA7)),
@@ -447,6 +475,62 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
           borderSide: const BorderSide(color: Color(0xFFD96BA7), width: 1.4),
         ),
       ),
+    );
+  }
+
+  Widget _buildBrandSelector(List<Category> categories) {
+    final selectedCategory = categories
+        .where((category) => category.id == _selectedCategoryId)
+        .firstOrNull;
+
+    final brandOptions = selectedCategory == null
+        ? [BrandOptions.other]
+        : BrandOptions.getBrands(selectedCategory.name);
+
+    final dropdownValue = brandOptions.contains(_selectedBrand)
+        ? _selectedBrand
+        : null;
+
+    return Column(
+      children: [
+        DropdownButtonFormField<String>(
+          value: dropdownValue,
+          hint: const Text('Marka seçiniz'),
+          decoration: InputDecoration(
+            labelText: 'Marka',
+            prefixIcon: const Icon(
+              Icons.sell_outlined,
+              color: Color(0xFFD96BA7),
+            ),
+            filled: true,
+            fillColor: Colors.white.withValues(alpha: 0.92),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(24),
+              borderSide: BorderSide.none,
+            ),
+          ),
+          items: brandOptions.map((brand) {
+            return DropdownMenuItem<String>(value: brand, child: Text(brand));
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              _selectedBrand = value;
+
+              if (_selectedBrand != BrandOptions.other) {
+                _brandController.clear();
+              }
+            });
+          },
+        ),
+        if (_selectedBrand == BrandOptions.other) ...[
+          const SizedBox(height: 14),
+          _buildTextField(
+            controller: _brandController,
+            label: 'Diğer Marka',
+            icon: Icons.edit_outlined,
+          ),
+        ],
+      ],
     );
   }
 

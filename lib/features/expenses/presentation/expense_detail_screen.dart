@@ -1,27 +1,32 @@
 import 'dart:io';
 
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
 import 'package:flutter_startup_app/features/expenses/domain/expense_sort_type.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
-import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
 
-class ExpenseDetailScreen extends StatefulWidget {
+class ExpenseDetailScreen extends ConsumerStatefulWidget {
   const ExpenseDetailScreen({super.key, required this.items});
 
   final List<Item> items;
 
   @override
-  State<ExpenseDetailScreen> createState() => _ExpenseDetailScreenState();
+  ConsumerState<ExpenseDetailScreen> createState() =>
+      _ExpenseDetailScreenState();
 }
 
-class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
+class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
   ExpenseSortType _sortType = ExpenseSortType.dateDesc;
 
   @override
   Widget build(BuildContext context) {
+    final categoriesAsync = ref.watch(categoriesProvider);
+
     final purchasedItems = widget.items
         .where((item) => item.isPurchased)
         .toList();
@@ -48,41 +53,48 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
             end: Alignment.bottomCenter,
           ),
         ),
-        child: Column(
-          children: [
-            _buildHeader(totalExpense, purchasedItems.length),
-            _buildSortBar(),
-            Expanded(
-              child: sortedItems.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'Henüz alınan ürün yok',
-                        style: TextStyle(
-                          color: Color(0xFF8A6B79),
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 100),
-                      itemCount: sortedItems.length,
-                      itemBuilder: (context, index) {
-                        final item = sortedItems[index];
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.only(bottom: 100),
+          child: Column(
+            children: [
+              _buildHeader(totalExpense, purchasedItems.length),
+              categoriesAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, __) => const SizedBox.shrink(),
+                data: (categories) {
+                  final chartItems = _buildCategoryExpenseItems(
+                    purchasedItems,
+                    categories,
+                  );
 
-                        return GestureDetector(
-                          onTap: () async {
-                            await Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => ItemFormScreen(item: item),
-                              ),
-                            );
-                          },
-                          child: _buildExpenseCard(item),
-                        );
-                      },
+                  if (chartItems.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return _buildPieChartCard(chartItems);
+                },
+              ),
+              _buildSortBar(),
+              if (sortedItems.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 40),
+                  child: Text(
+                    'Henüz alınan ürün yok',
+                    style: TextStyle(
+                      color: Color(0xFF8A6B79),
+                      fontWeight: FontWeight.w700,
                     ),
-            ),
-          ],
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+                  child: Column(
+                    children: sortedItems.map(_buildExpenseCard).toList(),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -312,5 +324,212 @@ class _ExpenseDetailScreenState extends State<ExpenseDetailScreen> {
         ],
       ),
     );
+  }
+
+  List<CategoryExpenseChartItem> _buildCategoryExpenseItems(
+    List<Item> items,
+    List<Category> categories,
+  ) {
+    final Map<int, double> totalsByCategory = {};
+
+    for (final item in items) {
+      final price = item.purchasedPrice ?? 0;
+
+      totalsByCategory[item.categoryId] =
+          (totalsByCategory[item.categoryId] ?? 0) + price;
+    }
+
+    final colors = [
+      const Color(0xFFD96BA7),
+      const Color(0xFFFFB74D),
+      const Color(0xFF7ACFA6),
+      const Color(0xFF8FA7FF),
+      const Color(0xFFB388FF),
+      const Color(0xFFFF8A80),
+    ];
+
+    int colorIndex = 0;
+
+    final chartItems = totalsByCategory.entries
+        .where((entry) => entry.value > 0)
+        .map((entry) {
+          final category = categories.firstWhere(
+            (category) => category.id == entry.key,
+            orElse: () => categories.first,
+          );
+
+          final item = CategoryExpenseChartItem(
+            categoryName: category.name,
+            amount: entry.value,
+            color: colors[colorIndex % colors.length],
+          );
+
+          colorIndex++;
+
+          return item;
+        })
+        .toList();
+
+    chartItems.sort((a, b) => b.amount.compareTo(a.amount));
+
+    return chartItems;
+  }
+
+  Widget _buildPieChartCard(List<CategoryExpenseChartItem> items) {
+    final total = items.fold<double>(0, (sum, item) => sum + item.amount);
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(26),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD96BA7).withValues(alpha: .08),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Harcama Dağılımı',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
+          ),
+
+          const SizedBox(height: 20),
+
+          SizedBox(
+            height: 165,
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: PieChart(
+                    PieChartData(
+                      centerSpaceRadius: 34,
+                      sectionsSpace: 2,
+                      sections: items.map((item) {
+                        final percent = (item.amount / total) * 100;
+
+                        return PieChartSectionData(
+                          color: item.color,
+                          value: item.amount,
+                          title: '%${percent.toStringAsFixed(0)}',
+                          radius: 42,
+                          titleStyle: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+
+                Expanded(
+                  flex: 2,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: items.map((item) {
+                      final percent = (item.amount / total) * 100;
+
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                color: item.color,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+
+                            const SizedBox(width: 8),
+
+                            Expanded(
+                              child: Text(
+                                item.categoryName,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+
+                            Text(
+                              '%${percent.toStringAsFixed(0)}',
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CategoryExpenseChartItem {
+  const CategoryExpenseChartItem({
+    required this.categoryName,
+    required this.amount,
+    required this.color,
+  });
+
+  final String categoryName;
+  final double amount;
+  final Color color;
+}
+
+class ExpensePieChartPainter extends CustomPainter {
+  ExpensePieChartPainter(this.items);
+
+  final List<CategoryExpenseChartItem> items;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final total = items.fold<double>(0, (sum, item) => sum + item.amount);
+
+    if (total <= 0) {
+      return;
+    }
+
+    final rect = Offset.zero & size;
+    double startAngle = -1.5708;
+
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 28
+      ..strokeCap = StrokeCap.round;
+
+    for (final item in items) {
+      final sweepAngle = (item.amount / total) * 6.28318;
+
+      paint.color = item.color;
+
+      canvas.drawArc(rect.deflate(18), startAngle, sweepAngle, false, paint);
+
+      startAngle += sweepAngle;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant ExpensePieChartPainter oldDelegate) {
+    return oldDelegate.items != items;
   }
 }
