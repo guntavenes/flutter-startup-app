@@ -2,15 +2,22 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
-import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
 import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
+import 'package:flutter_startup_app/features/items/data/item_providers.dart';
+import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 
 class ItemListScreen extends StatelessWidget {
-  const ItemListScreen({super.key, required this.title, required this.items});
+  const ItemListScreen({
+    super.key,
+    required this.title,
+    required this.items,
+    required this.filter,
+  });
 
   final String title;
   final List<Item> items;
+  final ItemFilter filter;
 
   @override
   Widget build(BuildContext context) {
@@ -105,16 +112,29 @@ class ItemListScreen extends StatelessWidget {
   }
 
   String _buildSubtitle(Item item) {
-    if (item.isPurchased) {
-      final price = item.purchasedPrice ?? 0;
+    switch (filter) {
+      case ItemFilter.all:
+        if (item.isPurchased) {
+          return 'Alındı • ${item.purchaseDate.toShortDateText()}';
+        }
 
-      return 'Alındı • ${item.purchaseDate.toShortDateText()} • ${price.toCurrency()}';
+        if (item.estimatedPurchaseDate != null) {
+          return 'Alınmadı: ${item.estimatedPurchaseDate.toShortDateText()}';
+        }
+
+        return 'Alınmadı';
+
+      case ItemFilter.purchased:
+        final price = item.purchasedPrice ?? 0;
+
+        return '${item.purchaseDate.toShortDateText()} • ${price.toCurrency()}';
+
+      case ItemFilter.remaining:
+        if (item.estimatedPurchaseDate == null) {
+          return 'Alınmadı';
+        }
+
+        return item.estimatedPurchaseDate.toShortDateText();
     }
-
-    if (item.estimatedPurchaseDate != null) {
-      return 'Alınmadı • Hedef: ${item.estimatedPurchaseDate.toShortDateText()}';
-    }
-
-    return 'Alınmadı';
   }
 }

@@ -33,6 +33,7 @@ class Items extends Table {
   IntColumn get createdAt => integer()();
 
   IntColumn get updateAt => integer()();
-  
-  IntColumn get estimatedPurchaseDate => integer().nullable()();
+
+  IntColumn get estimatedPurchaseDate =>
+      integer().named('estimated_purchase_date').nullable()();
 }

@@ -10,7 +10,7 @@ import 'package:flutter_startup_app/features/brands/data/brand_options.dart';
 import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
-import 'package:image_cropper/image_cropper.dart';
+import 'package:flutter_startup_app/features/items/presentation/image_crop_screen.dart';
 import 'package:image_picker/image_picker.dart';
 
 class ItemFormScreen extends ConsumerStatefulWidget {
@@ -784,48 +784,27 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
 
     final pickedFile = await picker.pickImage(
       source: source,
-      imageQuality: 80,
-      maxWidth: 1600,
-      maxHeight: 1600,
+      imageQuality: 85,
+      maxWidth: 2000,
+      maxHeight: 2000,
     );
 
-    if (pickedFile == null) {
+    if (pickedFile == null || !mounted) {
       return;
     }
 
-    final croppedFile = await ImageCropper().cropImage(
-      sourcePath: pickedFile.path,
-      compressFormat: ImageCompressFormat.jpg,
-      compressQuality: 75,
-      maxWidth: 800,
-      maxHeight: 500,
-      aspectRatio: CropAspectRatio(ratioX: _imageAspectRatio, ratioY: 1),
-      uiSettings: [
-        AndroidUiSettings(
-          toolbarTitle: 'Fotoğrafı Ayarla',
-          toolbarColor: const Color(0xFFD96BA7),
-          toolbarWidgetColor: Colors.white,
-          activeControlsWidgetColor: const Color(0xFFD96BA7),
-          lockAspectRatio: true,
-          cropFrameColor: const Color(0xFFD96BA7),
-          cropGridColor: Colors.white,
-          hideBottomControls: false,
-        ),
-        IOSUiSettings(
-          title: 'Fotoğrafı Ayarla',
-          aspectRatioLockEnabled: true,
-          resetAspectRatioEnabled: false,
-          aspectRatioPickerButtonHidden: true,
-        ),
-      ],
+    final croppedImagePath = await Navigator.of(context).push<String>(
+      MaterialPageRoute(
+        builder: (_) => ImageCropScreen(imagePath: pickedFile.path),
+      ),
     );
 
-    if (croppedFile == null) {
+    if (croppedImagePath == null || !mounted) {
       return;
     }
 
     setState(() {
-      _selectedImagePath = croppedFile.path;
+      _selectedImagePath = croppedImagePath;
     });
   }
 

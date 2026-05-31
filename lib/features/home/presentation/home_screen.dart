@@ -8,13 +8,13 @@ import 'package:flutter_startup_app/core/notifications/notification_planner_serv
 import 'package:flutter_startup_app/features/categories/presentation/category_detail_screen.dart';
 import 'package:flutter_startup_app/features/expenses/presentation/expense_detail_screen.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
+import 'package:flutter_startup_app/features/items/domain/planned_item_filter.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_list_screen.dart';
+import 'package:flutter_startup_app/features/items/presentation/planned_items_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
 import 'package:flutter_startup_app/features/templates/data/ceyiz_templates.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
-import 'package:flutter_startup_app/features/items/domain/planned_item_filter.dart';
-import 'package:flutter_startup_app/features/items/presentation/planned_items_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -210,7 +210,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               total.toString(),
               Icons.list_alt_rounded,
               const Color(0xFFFF8DBA),
-              onTap: () => _openItemList('Tüm Ürünler', items),
+              onTap: () => _openItemList('Tüm Ürünler', items, ItemFilter.all),
             ),
             const SizedBox(width: 10),
             _summaryCard(
@@ -221,6 +221,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onTap: () => _openItemList(
                 'Alınan Ürünler',
                 items.where((e) => e.isPurchased).toList(),
+                ItemFilter.purchased,
               ),
             ),
             const SizedBox(width: 10),
@@ -232,6 +233,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               onTap: () => _openItemList(
                 'Kalan Ürünler',
                 items.where((e) => !e.isPurchased).toList(),
+                ItemFilter.remaining,
               ),
             ),
           ],
@@ -362,10 +364,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  void _openItemList(String title, List<Item> items) {
+  void _openItemList(String title, List<Item> items, ItemFilter filter) {
     Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (_) => ItemListScreen(title: title, items: items),
+        builder: (_) =>
+            ItemListScreen(title: title, items: items, filter: filter),
       ),
     );
   }
