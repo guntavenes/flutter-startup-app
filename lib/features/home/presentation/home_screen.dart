@@ -78,7 +78,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(height: 14),
                   allItemsAsync.when(
                     loading: () => _buildSummary([]),
-                    error: (_, __) => _buildSummary([]),
+                    error: (_, _) => _buildSummary([]),
                     data: (allItems) => _buildSummary(allItems),
                   ),
                   const SizedBox(height: 10),
@@ -88,7 +88,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   const SizedBox(height: 12),
                   allItemsAsync.when(
                     loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
                     data: (allItems) {
                       if (allItems.isEmpty) {
                         return const SizedBox.shrink();

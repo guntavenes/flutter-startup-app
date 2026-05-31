@@ -59,7 +59,7 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
               _buildHeader(totalExpense, purchasedItems.length),
               categoriesAsync.when(
                 loading: () => const SizedBox.shrink(),
-                error: (_, __) => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
                 data: (categories) {
                   final chartItems = _buildCategoryExpenseItems(
                     purchasedItems,
@@ -204,7 +204,7 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
       child: DropdownButtonFormField<ExpenseSortType>(
-        value: _sortType,
+        initialValue: _sortType,
         decoration: InputDecoration(
           filled: true,
           fillColor: Colors.white,

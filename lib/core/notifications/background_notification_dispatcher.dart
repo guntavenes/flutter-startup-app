@@ -9,9 +9,6 @@ const String todayPlannedItemsTask = 'today_planned_items_task';
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((task, inputData) async {
-    print('BACKGROUND_TASK_STARTED');
-    print('TASK_NAME=$task');
-
     WidgetsFlutterBinding.ensureInitialized();
 
     await NotificationService.initialize(requestPermission: false);
@@ -20,16 +17,11 @@ void callbackDispatcher() {
 
     try {
       if (task == todayPlannedItemsTask) {
-        print('CHECKING_TODAY_ITEMS');
-
         await NotificationPlannerService.checkTodayItems(database);
       }
 
-      print('TASK_COMPLETED');
-
       return Future.value(true);
     } catch (e) {
-      print('BACKGROUND_ERROR=$e');
       return Future.value(false);
     } finally {
       await database.close();

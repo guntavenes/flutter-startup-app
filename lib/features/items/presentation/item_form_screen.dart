@@ -5,13 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
+import 'package:flutter_startup_app/core/formatters/turkish_currency_input_formatter.dart';
+import 'package:flutter_startup_app/features/brands/data/brand_options.dart';
 import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:flutter_startup_app/features/brands/data/brand_options.dart';
-import 'package:flutter_startup_app/core/formatters/turkish_currency_input_formatter.dart';
 import 'package:image_cropper/image_cropper.dart';
+import 'package:image_picker/image_picker.dart';
 
 class ItemFormScreen extends ConsumerStatefulWidget {
   const ItemFormScreen({super.key, this.item});
@@ -314,7 +314,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                   const SizedBox(height: 14),
                   categoriesAsync.when(
                     loading: () => const SizedBox.shrink(),
-                    error: (_, __) => const SizedBox.shrink(),
+                    error: (_, _) => const SizedBox.shrink(),
                     data: (categories) {
                       return _buildBrandSelector(categories);
                     },
@@ -404,7 +404,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
 
   Widget _buildCategoryDropdown(List<Category> categories) {
     return DropdownButtonFormField<int>(
-      value: _selectedCategoryId,
+      initialValue: _selectedCategoryId,
       validator: (value) {
         if (value == null) {
           return 'Kategori seçmelisin';
@@ -517,7 +517,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     return Column(
       children: [
         DropdownButtonFormField<String>(
-          value: dropdownValue,
+          initialValue: dropdownValue,
           hint: const Text('Marka seçiniz'),
           decoration: InputDecoration(
             prefixIcon: const Icon(

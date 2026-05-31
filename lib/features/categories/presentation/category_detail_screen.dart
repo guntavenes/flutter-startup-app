@@ -539,7 +539,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                   ),
                   const SizedBox(height: 10),
                   DropdownButtonFormField<String>(
-                    value: selectedBrand,
+                    initialValue: selectedBrand,
                     hint: const Text('Marka seçiniz'),
                     decoration: const InputDecoration(labelText: 'Marka'),
                     items: brandOptions.map((brand) {
