@@ -1,0 +1,4 @@
+enum PlannedItemFilter {
+  today,
+  week,
+}

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
+import 'package:flutter_startup_app/core/database/database_provider.dart';
 import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
+import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
+import 'package:flutter_startup_app/core/notifications/notification_planner_service.dart';
 import 'package:flutter_startup_app/features/categories/presentation/category_detail_screen.dart';
 import 'package:flutter_startup_app/features/expenses/presentation/expense_detail_screen.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
@@ -10,7 +13,8 @@ import 'package:flutter_startup_app/features/items/presentation/item_list_screen
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
 import 'package:flutter_startup_app/features/templates/data/ceyiz_templates.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
-import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
+import 'package:flutter_startup_app/features/items/domain/planned_item_filter.dart';
+import 'package:flutter_startup_app/features/items/presentation/planned_items_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -20,6 +24,26 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        await _checkTodayPlannedItemsNotification();
+      } catch (e, s) {
+        debugPrint('NOTIFICATION_ERROR: $e');
+        debugPrintStack(stackTrace: s);
+      }
+    });
+  }
+
+  Future<void> _checkTodayPlannedItemsNotification() async {
+    final database = ref.read(appDatabaseProvider);
+
+    await NotificationPlannerService.checkTodayItems(database);
+  }
+
   @override
   Widget build(BuildContext context) {
     final allItemsAsync = ref.watch(allItemsProvider);
@@ -46,65 +70,57 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(14, 18, 14, 0),
-            child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(14, 18, 14, 0),
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildHeader(),
-                      const SizedBox(height: 14),
-                      allItemsAsync.when(
-                        loading: () => _buildSummary([]),
-                        error: (_, __) => _buildSummary([]),
-                        data: (allItems) => _buildSummary(allItems),
-                      ),
-                      const SizedBox(height: 10),
-                      _buildRecentPurchasedCard(),
-                      const SizedBox(height: 10),
-                      _buildTemplateCard(),
-                      const SizedBox(height: 12),
-                      allItemsAsync.when(
-                        loading: () => const SizedBox.shrink(),
-                        error: (_, __) => const SizedBox.shrink(),
-                        data: (allItems) {
-                          if (allItems.isEmpty) {
-                            return const SizedBox.shrink();
-                          }
-
-                          return Column(
-                            children: [
-                              _buildFilters(),
-                              const SizedBox(height: 12),
-                            ],
-                          );
-                        },
-                      ),
-                      groupedItemsAsync.when(
-                        loading: () => const Padding(
-                          padding: EdgeInsets.all(24),
-                          child: Center(child: CircularProgressIndicator()),
-                        ),
-                        error: (error, _) => Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Center(child: Text('Hata: $error')),
-                        ),
-                        data: (groupedItems) {
-                          final hasAnyItem = groupedItems.values.any(
-                            (items) => items.isNotEmpty,
-                          );
-
-                          if (!hasAnyItem) {
-                            return _buildEmptyState();
-                          }
-
-                          return _buildGroupedItemList(groupedItems);
-                        },
-                      ),
-                    ],
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: 14),
+                  allItemsAsync.when(
+                    loading: () => _buildSummary([]),
+                    error: (_, __) => _buildSummary([]),
+                    data: (allItems) => _buildSummary(allItems),
                   ),
-                ),
+                  const SizedBox(height: 10),
+                  _buildRecentPurchasedCard(),
+                  const SizedBox(height: 10),
+                  _buildTemplateCard(),
+                  const SizedBox(height: 12),
+                  allItemsAsync.when(
+                    loading: () => const SizedBox.shrink(),
+                    error: (_, __) => const SizedBox.shrink(),
+                    data: (allItems) {
+                      if (allItems.isEmpty) {
+                        return const SizedBox.shrink();
+                      }
+
+                      return Column(
+                        children: [_buildFilters(), const SizedBox(height: 12)],
+                      );
+                    },
+                  ),
+                  groupedItemsAsync.when(
+                    loading: () => const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    ),
+                    error: (error, _) => Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Center(child: Text('Hata: $error')),
+                    ),
+                    data: (groupedItems) {
+                      final hasAnyItem = groupedItems.values.any(
+                        (items) => items.isNotEmpty,
+                      );
+
+                      if (!hasAnyItem) {
+                        return _buildEmptyState();
+                      }
+
+                      return _buildGroupedItemList(groupedItems);
+                    },
+                  ),
+                ],
               ),
             ),
           ),
@@ -233,59 +249,63 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildUpcomingCard(List<Item> items) {
     final firstItem = items.first;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFFFD59E)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.orange.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 10),
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) =>
+                const PlannedItemsScreen(filter: PlannedItemFilter.today),
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFF3E0),
-              borderRadius: BorderRadius.circular(16),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFFFD59E)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF3E0),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(
+                Icons.notifications_active_outlined,
+                color: Color(0xFFFF9800),
+              ),
             ),
-            child: const Icon(
-              Icons.notifications_active_outlined,
-              color: Color(0xFFFF9800),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${items.length} yaklaşan alım',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF2C1E26),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${items.length} yaklaşan alım',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF2C1E26),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${firstItem.name} • ${firstItem.estimatedPurchaseDate.toShortDateText()}',
-                  style: const TextStyle(
-                    color: Color(0xFF8A6B79),
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(height: 4),
+                  Text(
+                    '${firstItem.name} • ${firstItem.estimatedPurchaseDate.toShortDateText()}',
+                    style: const TextStyle(
+                      color: Color(0xFF8A6B79),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF8A6B79)),
+          ],
+        ),
       ),
     );
   }
