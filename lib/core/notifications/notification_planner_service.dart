@@ -20,10 +20,10 @@ class NotificationPlannerService {
       return;
     }
 
-    // if (await _wasNotificationSentToday()) {
-    //   debugPrint('TODAY_NOTIFICATION_ALREADY_SENT');
-    //   return;
-    // }
+    if (await _wasNotificationSentToday()) {
+      debugPrint('TODAY_NOTIFICATION_ALREADY_SENT');
+      return;
+    }
 
     await NotificationService.showTodayPlannedItemsNotification(
       itemCount: todayItems.length,

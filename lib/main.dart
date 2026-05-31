@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_startup_app/core/notifications/background_notification_dispatcher.dart';
 import 'package:flutter_startup_app/core/notifications/notification_service.dart';
 import 'package:flutter_startup_app/features/home/presentation/home_screen.dart';
 import 'package:flutter_startup_app/features/items/domain/planned_item_filter.dart';
 import 'package:flutter_startup_app/features/items/presentation/planned_items_screen.dart';
+import 'package:workmanager/workmanager.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
@@ -11,6 +13,15 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await NotificationService.initialize();
+
+  await Workmanager().initialize(callbackDispatcher);
+
+  await Workmanager().registerPeriodicTask(
+    'today-planned-items-periodic-task',
+    todayPlannedItemsTask,
+    frequency: const Duration(hours: 24),
+    existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
+  );
 
   runApp(const ProviderScope(child: StartupApp()));
 }
