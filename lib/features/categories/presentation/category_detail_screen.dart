@@ -187,6 +187,50 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
     );
 
     await _reloadCategoryItemsFromDb();
+
+    if (mounted) {
+      await _showPurchasedSuccessDialog(item);
+    }
+  }
+
+  Future<void> _showPurchasedSuccessDialog(Item item) async {
+    final shouldUndo = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Ürün alındı'),
+          content: Text('${item.name} alınanlar listesine taşındı.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(false);
+              },
+              child: const Text('Tamam'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop(true);
+              },
+              child: const Text(
+                'Geri Al',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (shouldUndo != true) {
+      return;
+    }
+
+    final repo = ref.read(itemRepositoryProvider);
+
+    await repo.undoPurchased(item);
+
+    await _reloadCategoryItemsFromDb();
   }
 
   Future<void> _handleDeleteAction(Item item) async {
@@ -335,17 +379,18 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                     color: Color(0xFF2C1E26),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  _buildSubtitle(item),
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: item.isPurchased
-                        ? const Color(0xFF2EAD5B)
-                        : const Color(0xFF8A6B79),
+
+                if (_buildSubtitle(item).isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    _buildSubtitle(item),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF2EAD5B),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),
@@ -620,16 +665,10 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
   String _buildSubtitle(Item item) {
     if (item.isPurchased) {
       final price = item.purchasedPrice ?? 0;
-      final dateText = item.purchaseDate.toShortDateText();
 
-      return 'Alındı • $dateText • ${price.toCurrency()}';
+      return price.toCurrency();
     }
-
-    if (item.estimatedPurchaseDate != null) {
-      return 'Alınmadı • Hedef: ${item.estimatedPurchaseDate.toShortDateText()}';
-    }
-
-    return 'Alınmadı';
+    return '';
   }
 }
 

@@ -42,31 +42,47 @@ class ItemRepository {
   }
 
   Future<int> markAsPurchased({
-  required Item item,
-  required double price,
-  required String? brand,
-  required int purchaseDate,
-}) {
-  return (_database.update(_database.items)..where((tbl) => tbl.id.equals(item.id)))
-      .write(
-    ItemsCompanion(
-      isPurchased: const Value(true),
-      purchasedPrice: Value(price),
-      brand: Value(brand),
-      purchaseDate: Value(purchaseDate),
-      updateAt: Value(DateTime.now().millisecondsSinceEpoch),
-    ),
-  );
-}
+    required Item item,
+    required double price,
+    required String? brand,
+    required int purchaseDate,
+  }) {
+    return (_database.update(
+      _database.items,
+    )..where((tbl) => tbl.id.equals(item.id))).write(
+      ItemsCompanion(
+        isPurchased: const Value(true),
+        purchasedPrice: Value(price),
+        brand: Value(brand),
+        purchaseDate: Value(purchaseDate),
+        updateAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+  }
 
-Future<int> markAsNotPurchased(Item item) {
-  return (_database.update(_database.items)..where((tbl) => tbl.id.equals(item.id)))
-      .write(
-    ItemsCompanion(
-      isPurchased: const Value(false),
-      purchaseDate: const Value.absent(),
-      updateAt: Value(DateTime.now().millisecondsSinceEpoch),
-    ),
-  );
-}
+  Future<int> markAsNotPurchased(Item item) {
+    return (_database.update(
+      _database.items,
+    )..where((tbl) => tbl.id.equals(item.id))).write(
+      ItemsCompanion(
+        isPurchased: const Value(false),
+        purchaseDate: const Value.absent(),
+        updateAt: Value(DateTime.now().millisecondsSinceEpoch),
+      ),
+    );
+  }
+
+  Future<int> undoPurchased(Item item) {
+    return (_database.update(
+      _database.items,
+    )..where((tbl) => tbl.id.equals(item.id))).write(
+      const ItemsCompanion(
+        isPurchased: Value(false),
+        purchasedPrice: Value(null),
+        purchaseDate: Value(null),
+        brand: Value(null),
+        model: Value(null),
+      ),
+    );
+  }
 }

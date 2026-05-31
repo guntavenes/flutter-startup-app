@@ -11,6 +11,7 @@ import 'package:flutter_startup_app/features/items/data/item_repository_provider
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_startup_app/features/brands/data/brand_options.dart';
 import 'package:flutter_startup_app/core/formatters/turkish_currency_input_formatter.dart';
+import 'package:image_cropper/image_cropper.dart';
 
 class ItemFormScreen extends ConsumerStatefulWidget {
   const ItemFormScreen({super.key, this.item});
@@ -39,6 +40,9 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
   DateTime? _purchaseDate;
   DateTime? _estimatedPurchaseDate;
   String? _selectedBrand;
+  static const double _imageAspectRatio = 1.6;
+  static const double _maxImagePickerWidth = 300;
+  static const double _maxImagePickerHeight = 210;
 
   @override
   void initState() {
@@ -95,6 +99,16 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
       return;
     }
 
+    if (_selectedCategoryId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Kategori seçmelisin.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     final repository = ref.read(itemRepositoryProvider);
     final now = DateTime.now().millisecondsSinceEpoch;
 
@@ -104,6 +118,13 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
         .replaceAll(',', '.');
 
     final price = double.tryParse(priceText);
+
+    final purchaseDateValue = _isPurchased
+        ? _purchaseDate?.millisecondsSinceEpoch
+        : null;
+
+    final estimatedPurchaseDateValue =
+        _estimatedPurchaseDate?.millisecondsSinceEpoch;
 
     if (_isEditMode) {
       await repository.updateItemDetails(
@@ -118,10 +139,8 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
           note: Value(_emptyToNull(_noteController.text)),
           imagePath: Value(_selectedImagePath),
           isPurchased: Value(_isPurchased),
-          purchaseDate: Value(_purchaseDate?.millisecondsSinceEpoch),
-          estimatedPurchaseDate: Value(
-            _estimatedPurchaseDate?.millisecondsSinceEpoch,
-          ),
+          purchaseDate: Value(purchaseDateValue),
+          estimatedPurchaseDate: Value(estimatedPurchaseDateValue),
           updateAt: Value(now),
         ),
       );
@@ -137,10 +156,8 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
           note: Value(_emptyToNull(_noteController.text)),
           imagePath: Value(_selectedImagePath),
           isPurchased: Value(_isPurchased),
-          purchaseDate: Value(_purchaseDate?.millisecondsSinceEpoch),
-          estimatedPurchaseDate: Value(
-            _estimatedPurchaseDate?.millisecondsSinceEpoch,
-          ),
+          purchaseDate: Value(purchaseDateValue),
+          estimatedPurchaseDate: Value(estimatedPurchaseDateValue),
           createdAt: now,
           updateAt: now,
         ),
@@ -148,6 +165,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     }
 
     ref.invalidate(allItemsProvider);
+    ref.invalidate(groupedItemsProvider);
 
     if (mounted) {
       Navigator.of(context).pop(true);
@@ -308,49 +326,56 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                     icon: Icons.category_outlined,
                   ),
                   const SizedBox(height: 14),
-                  _buildTextField(
-                    controller: _priceController,
-                    label: 'Fiyat',
-                    icon: Icons.payments_outlined,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [TurkishCurrencyInputFormatter()],
-                  ),
-                  const SizedBox(height: 14),
-                  _buildDatePickerTile(
-                    title: 'Alınma Tarihi',
-                    value: _purchaseDate,
-                    icon: Icons.event_available_outlined,
-                    onTap: () async {
-                      final selectedDate = await _pickDate(_purchaseDate);
+                  _buildPurchasedSwitch(),
 
-                      if (selectedDate == null) {
-                        return;
-                      }
+                  if (_isPurchased) ...[
+                    const SizedBox(height: 14),
+                    _buildTextField(
+                      controller: _priceController,
+                      label: 'Fiyat',
+                      icon: Icons.payments_outlined,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [TurkishCurrencyInputFormatter()],
+                    ),
+                    const SizedBox(height: 14),
+                    _buildDatePickerTile(
+                      title: 'Alınma Tarihi',
+                      value: _purchaseDate,
+                      icon: Icons.event_available_outlined,
+                      onTap: () async {
+                        final selectedDate = await _pickDate(_purchaseDate);
 
-                      setState(() {
-                        _purchaseDate = selectedDate;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  _buildDatePickerTile(
-                    title: 'Tahmini Alınma Tarihi',
-                    value: _estimatedPurchaseDate,
-                    icon: Icons.event_note_outlined,
-                    onTap: () async {
-                      final selectedDate = await _pickDate(
-                        _estimatedPurchaseDate,
-                      );
+                        if (selectedDate == null) {
+                          return;
+                        }
 
-                      if (selectedDate == null) {
-                        return;
-                      }
+                        setState(() {
+                          _purchaseDate = selectedDate;
+                        });
+                      },
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 14),
+                    _buildDatePickerTile(
+                      title: 'Tahmini Alınma Tarihi',
+                      value: _estimatedPurchaseDate,
+                      icon: Icons.event_note_outlined,
+                      onTap: () async {
+                        final selectedDate = await _pickDate(
+                          _estimatedPurchaseDate,
+                        );
 
-                      setState(() {
-                        _estimatedPurchaseDate = selectedDate;
-                      });
-                    },
-                  ),
+                        if (selectedDate == null) {
+                          return;
+                        }
+
+                        setState(() {
+                          _estimatedPurchaseDate = selectedDate;
+                        });
+                      },
+                    ),
+                  ],
+
                   const SizedBox(height: 14),
                   _buildTextField(
                     controller: _linkController,
@@ -364,8 +389,6 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                     icon: Icons.notes_outlined,
                     maxLines: 3,
                   ),
-                  const SizedBox(height: 16),
-                  _buildPurchasedSwitch(),
                   if (!_isEditMode) ...[
                     const SizedBox(height: 24),
                     _buildSaveButton(),
@@ -497,7 +520,6 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
           value: dropdownValue,
           hint: const Text('Marka seçiniz'),
           decoration: InputDecoration(
-            labelText: 'Marka',
             prefixIcon: const Icon(
               Icons.sell_outlined,
               color: Color(0xFFD96BA7),
@@ -586,43 +608,86 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
 
   Widget _buildPurchasedSwitch() {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.92),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFD96BA7).withValues(alpha: 0.08),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
+      ),
+      child: Row(
+        children: [
+          _buildPurchaseStatusChip(
+            title: 'Planlanıyor',
+            icon: Icons.event_note_outlined,
+            isSelected: !_isPurchased,
+            onTap: () {
+              setState(() {
+                _isPurchased = false;
+                _purchaseDate = null;
+              });
+            },
+          ),
+          const SizedBox(width: 8),
+          _buildPurchaseStatusChip(
+            title: 'Alındı',
+            icon: Icons.check_circle_outline_rounded,
+            isSelected: _isPurchased,
+            onTap: () {
+              setState(() {
+                _isPurchased = true;
+                _purchaseDate ??= DateTime.now();
+                _estimatedPurchaseDate = null;
+              });
+            },
           ),
         ],
       ),
-      child: SwitchListTile(
-        contentPadding: EdgeInsets.zero,
-        value: _isPurchased,
-        onChanged: (value) {
-          setState(() {
-            _isPurchased = value;
+    );
+  }
 
-            if (value && _purchaseDate == null) {
-              _purchaseDate = DateTime.now();
-            }
-          });
-        },
-        title: const Text(
-          'Alındı olarak işaretle',
-          style: TextStyle(
-            fontWeight: FontWeight.w700,
-            color: Color(0xFF2C1E26),
+  Widget _buildPurchaseStatusChip({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(vertical: 13),
+          decoration: BoxDecoration(
+            gradient: isSelected
+                ? const LinearGradient(
+                    colors: [Color(0xFFD96BA7), Color(0xFFFF8DBA)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            color: isSelected ? null : const Color(0xFFFFF7FB),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: isSelected ? Colors.white : const Color(0xFFD96BA7),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w900,
+                  color: isSelected ? Colors.white : const Color(0xFF6D4C5B),
+                ),
+              ),
+            ],
           ),
         ),
-        subtitle: const Text(
-          'Bu ürün toplam harcamaya dahil edilir.',
-          style: TextStyle(color: Color(0xFF8A6B79)),
-        ),
-        activeColor: const Color(0xFFD96BA7),
       ),
     );
   }
@@ -719,17 +784,48 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
 
     final pickedFile = await picker.pickImage(
       source: source,
-      imageQuality: 70,
-      maxWidth: 1200,
-      maxHeight: 1200,
+      imageQuality: 80,
+      maxWidth: 1600,
+      maxHeight: 1600,
     );
 
     if (pickedFile == null) {
       return;
     }
 
+    final croppedFile = await ImageCropper().cropImage(
+      sourcePath: pickedFile.path,
+      compressFormat: ImageCompressFormat.jpg,
+      compressQuality: 75,
+      maxWidth: 800,
+      maxHeight: 500,
+      aspectRatio: CropAspectRatio(ratioX: _imageAspectRatio, ratioY: 1),
+      uiSettings: [
+        AndroidUiSettings(
+          toolbarTitle: 'Fotoğrafı Ayarla',
+          toolbarColor: const Color(0xFFD96BA7),
+          toolbarWidgetColor: Colors.white,
+          activeControlsWidgetColor: const Color(0xFFD96BA7),
+          lockAspectRatio: true,
+          cropFrameColor: const Color(0xFFD96BA7),
+          cropGridColor: Colors.white,
+          hideBottomControls: false,
+        ),
+        IOSUiSettings(
+          title: 'Fotoğrafı Ayarla',
+          aspectRatioLockEnabled: true,
+          resetAspectRatioEnabled: false,
+          aspectRatioPickerButtonHidden: true,
+        ),
+      ],
+    );
+
+    if (croppedFile == null) {
+      return;
+    }
+
     setState(() {
-      _selectedImagePath = pickedFile.path;
+      _selectedImagePath = croppedFile.path;
     });
   }
 
@@ -793,44 +889,54 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
   }
 
   Widget _buildImagePicker() {
-    return GestureDetector(
-      onTap: _showImageSourceSheet,
-      child: Container(
-        width: double.infinity,
-        height: 150,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.92),
-          borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: _maxImagePickerWidth,
+          maxHeight: _maxImagePickerHeight,
         ),
-        child: _selectedImagePath == null
-            ? const Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.add_photo_alternate_outlined,
-                    color: Color(0xFFD96BA7),
-                    size: 36,
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Fotoğraf ekle',
-                    style: TextStyle(
-                      color: Color(0xFF8A6B79),
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              )
-            : ClipRRect(
+        child: GestureDetector(
+          onTap: _showImageSourceSheet,
+          child: AspectRatio(
+            aspectRatio: _imageAspectRatio,
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.92),
                 borderRadius: BorderRadius.circular(26),
-                child: Image.file(
-                  File(_selectedImagePath!),
-                  width: double.infinity,
-                  height: 150,
-                  fit: BoxFit.cover,
-                ),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
               ),
+              clipBehavior: Clip.antiAlias,
+              child: _selectedImagePath == null
+                  ? const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.add_photo_alternate_outlined,
+                          color: Color(0xFFD96BA7),
+                          size: 34,
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Fotoğraf ekle',
+                          style: TextStyle(
+                            color: Color(0xFF8A6B79),
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    )
+                  : Image.file(
+                      File(_selectedImagePath!),
+                      width: double.infinity,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      cacheWidth: 800,
+                      cacheHeight: 500,
+                    ),
+            ),
+          ),
+        ),
       ),
     );
   }
