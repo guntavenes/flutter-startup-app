@@ -6,7 +6,7 @@ import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/domain/planned_item_filter.dart';
-import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
+import 'package:flutter_startup_app/features/items/presentation/item_detail_screen.dart';
 
 class PlannedItemsScreen extends ConsumerWidget {
   const PlannedItemsScreen({super.key, required this.filter});
@@ -90,7 +90,7 @@ class PlannedItemsScreen extends ConsumerWidget {
                   onTap: () async {
                     final result = await Navigator.of(context).push<bool>(
                       MaterialPageRoute(
-                        builder: (_) => ItemFormScreen(item: item),
+                        builder: (_) => ItemDetailScreen(item: item),
                       ),
                     );
 

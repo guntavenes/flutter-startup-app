@@ -867,6 +867,12 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     );
   }
 
+  void _removeImage() {
+    setState(() {
+      _selectedImagePath = null;
+    });
+  }
+
   Widget _buildImagePicker() {
     return Center(
       child: ConstrainedBox(
@@ -905,13 +911,37 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                         ),
                       ],
                     )
-                  : Image.file(
-                      File(_selectedImagePath!),
-                      width: double.infinity,
-                      height: double.infinity,
-                      fit: BoxFit.cover,
-                      cacheWidth: 800,
-                      cacheHeight: 500,
+                  : Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Image.file(
+                            File(_selectedImagePath!),
+                            fit: BoxFit.cover,
+                            cacheWidth: 800,
+                            cacheHeight: 500,
+                          ),
+                        ),
+                        Positioned(
+                          right: 10,
+                          top: 10,
+                          child: GestureDetector(
+                            onTap: _removeImage,
+                            child: Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.55),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close_rounded,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
             ),
           ),

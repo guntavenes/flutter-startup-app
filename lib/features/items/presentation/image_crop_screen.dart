@@ -6,7 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
 class ImageCropScreen extends StatefulWidget {
-  const ImageCropScreen({super.key, required this.imagePath});
+  const ImageCropScreen({
+    super.key,
+    required this.imagePath,
+  });
 
   final String imagePath;
 
@@ -32,8 +35,9 @@ class _ImageCropScreenState extends State<ImageCropScreen> {
   Future<void> _saveCroppedImage(Uint8List croppedData) async {
     final directory = await getApplicationDocumentsDirectory();
 
-    final fileName = 'item_${DateTime.now().millisecondsSinceEpoch}.jpg';
-    final file = File('${directory.path}/$fileName');
+    final file = File(
+      '${directory.path}/item_${DateTime.now().millisecondsSinceEpoch}.jpg',
+    );
 
     await file.writeAsBytes(croppedData);
 
@@ -58,7 +62,9 @@ class _ImageCropScreenState extends State<ImageCropScreen> {
           future: _imageDataFuture,
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(
+                child: CircularProgressIndicator(),
+              );
             }
 
             return Column(
@@ -69,8 +75,8 @@ class _ImageCropScreenState extends State<ImageCropScreen> {
                       padding: const EdgeInsets.all(14),
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(
-                          maxWidth: 380,
-                          maxHeight: 380,
+                          maxWidth: 390,
+                          maxHeight: 390,
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(24),
@@ -82,13 +88,11 @@ class _ImageCropScreenState extends State<ImageCropScreen> {
                               aspectRatio: _imageAspectRatio,
                               interactive: true,
                               fixCropRect: false,
-                              willUpdateScale: (scale) {
-                                return true;
-                              },
                               onCropped: (result) {
                                 switch (result) {
                                   case CropSuccess(:final croppedImage):
                                     _saveCroppedImage(croppedImage);
+
                                   case CropFailure():
                                     setState(() {
                                       _isCropping = false;
@@ -102,10 +106,22 @@ class _ImageCropScreenState extends State<ImageCropScreen> {
                     ),
                   ),
                 ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 18),
+                  child: Text(
+                    'Fotoğrafı iki parmağınla büyütüp küçültebilir, çerçeveye göre ayarlayabilirsin.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFF8A6B79),
+                      fontWeight: FontWeight.w600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
-                  decoration: const BoxDecoration(color: Color(0xFFFFF5FA)),
+                  padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
                   child: SizedBox(
                     height: 54,
                     child: ElevatedButton.icon(
@@ -138,7 +154,9 @@ class _ImageCropScreenState extends State<ImageCropScreen> {
                           : const Icon(Icons.check_rounded),
                       label: Text(
                         _isCropping ? 'Ekleniyor...' : 'Fotoğrafı Ekle',
-                        style: const TextStyle(fontWeight: FontWeight.w900),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
                     ),
                   ),

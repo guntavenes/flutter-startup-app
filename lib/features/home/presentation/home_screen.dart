@@ -15,6 +15,7 @@ import 'package:flutter_startup_app/features/items/presentation/planned_items_sc
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
 import 'package:flutter_startup_app/features/templates/data/ceyiz_templates.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
+import 'package:flutter_startup_app/features/export/data/excel_export_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -74,7 +75,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildHeader(),
+                  allItemsAsync.when(
+                    loading: () => _buildHeader([]),
+                    error: (_, _) => _buildHeader([]),
+                    data: (allItems) => _buildHeader(allItems),
+                  ),
                   const SizedBox(height: 14),
                   allItemsAsync.when(
                     loading: () => _buildSummary([]),
@@ -129,62 +134,90 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(List<Item> allItems) {
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFFFF8DBA), Color(0xFFD96BA7), Color(0xFFFFB6D5)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(30),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFFD96BA7).withValues(alpha: 0.28),
-            blurRadius: 28,
-            offset: const Offset(0, 14),
-          ),
-        ],
+        color: Colors.white.withValues(alpha: 0.78),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
       ),
       child: Row(
         children: [
           Container(
-            width: 48,
-            height: 48,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(22),
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFFC7E3), Color(0xFFFFEEF7)],
+              ),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: const Center(
-              child: Text('🎁', style: TextStyle(fontSize: 30)),
+              child: Text('🎁', style: TextStyle(fontSize: 24)),
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           const Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Çeyiz Takip',
+                  'Çeyiz Özeti',
                   style: TextStyle(
-                    fontSize: 23,
+                    fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    color: Colors.white,
+                    color: Color(0xFF2C1E26),
                   ),
                 ),
-                SizedBox(height: 6),
+                SizedBox(height: 3),
                 Text(
-                  'İhtiyaçlarını, aldıklarını ve bütçeni kolayca yönet.',
+                  'Listen, harcamaların ve planların',
                   style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white,
-                    height: 1.35,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF8A6B79),
                   ),
                 ),
               ],
             ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF6D4C5B)),
+            onSelected: (value) async {
+              if (value == 'excel') {
+                final path = await ExcelExportService.exportItems(
+                  items: allItems,
+                );
+
+                if (!context.mounted) {
+                  return;
+                }
+
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      path == null
+                          ? 'Excel dosyası oluşturulamadı.'
+                          : 'Excel dosyası telefona kaydedildi.',
+                    ),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            itemBuilder: (context) => const [
+              PopupMenuItem(
+                value: 'excel',
+                child: Row(
+                  children: [
+                    Icon(Icons.table_chart_outlined),
+                    SizedBox(width: 10),
+                    Text('Excel Olarak Dışa Aktar'),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

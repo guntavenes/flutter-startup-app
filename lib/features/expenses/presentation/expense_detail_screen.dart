@@ -21,21 +21,44 @@ class ExpenseDetailScreen extends ConsumerStatefulWidget {
 
 class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
   ExpenseSortType _sortType = ExpenseSortType.dateDesc;
+  int? _selectedCategoryId;
 
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesProvider);
 
-    final purchasedItems = widget.items
-        .where((item) => item.isPurchased)
-        .toList();
+    final purchasedItems = widget.items.where((item) {
+      if (!item.isPurchased) {
+        return false;
+      }
 
+      if (_selectedCategoryId == null) {
+        return true;
+      }
+
+      return item.categoryId == _selectedCategoryId;
+    }).toList();
     final sortedItems = _sortItems(purchasedItems);
 
     final totalExpense = purchasedItems.fold<double>(
       0,
       (sum, item) => sum + (item.purchasedPrice ?? 0),
     );
+
+    final averageExpense = purchasedItems.isEmpty
+        ? 0.0
+        : totalExpense / purchasedItems.length;
+
+    final mostExpensiveItem = purchasedItems.isEmpty
+        ? null
+        : purchasedItems.reduce(
+            (a, b) =>
+                (a.purchasedPrice ?? 0) >= (b.purchasedPrice ?? 0) ? a : b,
+          );
+
+    final completionPercent = widget.items.isEmpty
+        ? 0.0
+        : (purchasedItems.length / widget.items.length) * 100;
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFF5FA),
@@ -58,19 +81,46 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
             children: [
               _buildHeader(totalExpense, purchasedItems.length),
               categoriesAsync.when(
-                loading: () => const SizedBox.shrink(),
-                error: (_, _) => const SizedBox.shrink(),
+                loading: () => _buildStatisticsCards(
+                  mostExpensiveItem: mostExpensiveItem,
+                  averageExpense: averageExpense,
+                  topCategoryName: '-',
+                  completionPercent: completionPercent,
+                ),
+                error: (_, _) => _buildStatisticsCards(
+                  mostExpensiveItem: mostExpensiveItem,
+                  averageExpense: averageExpense,
+                  topCategoryName: '-',
+                  completionPercent: completionPercent,
+                ),
                 data: (categories) {
                   final chartItems = _buildCategoryExpenseItems(
                     purchasedItems,
                     categories,
                   );
 
-                  if (chartItems.isEmpty) {
-                    return const SizedBox.shrink();
-                  }
+                  final topCategoryName = chartItems.isEmpty
+                      ? '-'
+                      : chartItems.first.categoryName;
 
-                  return _buildPieChartCard(chartItems);
+                  return Column(
+                    children: [
+                      _buildStatisticsCards(
+                        mostExpensiveItem: mostExpensiveItem,
+                        averageExpense: averageExpense,
+                        topCategoryName: topCategoryName,
+                        completionPercent: completionPercent,
+                      ),
+                      if (chartItems.isNotEmpty) _buildPieChartCard(chartItems),
+                    ],
+                  );
+                },
+              ),
+              categoriesAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+                data: (categories) {
+                  return _buildCategoryFilterBar(categories);
                 },
               ),
               _buildSortBar(),
@@ -99,6 +149,72 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
     );
   }
 
+  Widget _buildCategoryFilterBar(List<Category> categories) {
+    return SizedBox(
+      height: 48,
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+        children: [
+          _buildCategoryFilterChip(
+            title: 'Tümü',
+            isSelected: _selectedCategoryId == null,
+            onTap: () {
+              setState(() {
+                _selectedCategoryId = null;
+              });
+            },
+          ),
+          ...categories.map((category) {
+            return _buildCategoryFilterChip(
+              title: category.name,
+              isSelected: _selectedCategoryId == category.id,
+              onTap: () {
+                setState(() {
+                  _selectedCategoryId = category.id;
+                });
+              },
+            );
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCategoryFilterChip({
+    required String title,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? const Color(0xFFD96BA7) : Colors.white,
+            borderRadius: BorderRadius.circular(100),
+            border: Border.all(
+              color: isSelected
+                  ? const Color(0xFFD96BA7)
+                  : const Color(0xFFFFD6EA),
+            ),
+          ),
+          child: Text(
+            title,
+            style: TextStyle(
+              color: isSelected ? Colors.white : const Color(0xFF8A6B79),
+              fontWeight: FontWeight.w800,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   List<Item> _sortItems(List<Item> items) {
     final sortedItems = [...items];
 
@@ -110,18 +226,21 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
           ),
         );
         break;
+
       case ExpenseSortType.dateAsc:
         sortedItems.sort(
-          (a, b) => (b.purchaseDate ?? b.updateAt).compareTo(
-            a.purchaseDate ?? a.updateAt,
+          (a, b) => (a.purchaseDate ?? a.updateAt).compareTo(
+            b.purchaseDate ?? b.updateAt,
           ),
         );
         break;
+
       case ExpenseSortType.priceDesc:
         sortedItems.sort(
           (a, b) => (b.purchasedPrice ?? 0).compareTo(a.purchasedPrice ?? 0),
         );
         break;
+
       case ExpenseSortType.priceAsc:
         sortedItems.sort(
           (a, b) => (a.purchasedPrice ?? 0).compareTo(b.purchasedPrice ?? 0),
@@ -200,6 +319,131 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
     );
   }
 
+  Widget _buildStatisticsCards({
+    required Item? mostExpensiveItem,
+    required double averageExpense,
+    required String topCategoryName,
+    required double completionPercent,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: _buildMiniStatCard(
+                  icon: Icons.emoji_events_outlined,
+                  title: 'En Pahalı',
+                  value: mostExpensiveItem == null
+                      ? '-'
+                      : (mostExpensiveItem.purchasedPrice ?? 0).toCurrency(),
+                  subtitle: mostExpensiveItem?.name ?? '',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildMiniStatCard(
+                  icon: Icons.calculate_outlined,
+                  title: 'Ortalama',
+                  value: averageExpense.toCurrency(),
+                  subtitle: 'Ürün başı',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _buildMiniStatCard(
+                  icon: Icons.category_outlined,
+                  title: 'En Çok Harcama',
+                  value: topCategoryName,
+                  subtitle: 'Kategori',
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildMiniStatCard(
+                  icon: Icons.percent_rounded,
+                  title: 'Tamamlanma',
+                  value: '%${completionPercent.toStringAsFixed(0)}',
+                  subtitle: 'Alınan oranı',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMiniStatCard({
+    required IconData icon,
+    required String title,
+    required String value,
+    required String subtitle,
+  }) {
+    return Container(
+      height: 112,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.94),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFFFD6EA)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD96BA7).withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: const Color(0xFFD96BA7), size: 22),
+          const Spacer(),
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF8A6B79),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF2C1E26),
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          if (subtitle.trim().isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF8A6B79),
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _buildSortBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
@@ -271,6 +515,8 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
                     width: 44,
                     height: 44,
                     fit: BoxFit.cover,
+                    cacheWidth: 160,
+                    cacheHeight: 160,
                   )
                 : Container(
                     width: 44,
@@ -352,13 +598,12 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
     final chartItems = totalsByCategory.entries
         .where((entry) => entry.value > 0)
         .map((entry) {
-          final category = categories.firstWhere(
-            (category) => category.id == entry.key,
-            orElse: () => categories.first,
-          );
+          final category = categories
+              .where((category) => category.id == entry.key)
+              .firstOrNull;
 
           final item = CategoryExpenseChartItem(
-            categoryName: category.name,
+            categoryName: category?.name ?? 'Diğer',
             amount: entry.value,
             color: colors[colorIndex % colors.length],
           );
@@ -398,11 +643,9 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
             'Harcama Dağılımı',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900),
           ),
-
           const SizedBox(height: 20),
-
           SizedBox(
-            height: 165,
+            height: 180,
             child: Row(
               children: [
                 Expanded(
@@ -412,7 +655,9 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
                       centerSpaceRadius: 34,
                       sectionsSpace: 2,
                       sections: items.map((item) {
-                        final percent = (item.amount / total) * 100;
+                        final percent = total == 0
+                            ? 0
+                            : (item.amount / total) * 100;
 
                         return PieChartSectionData(
                           color: item.color,
@@ -429,16 +674,17 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
                     ),
                   ),
                 ),
-
                 Expanded(
                   flex: 2,
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: items.map((item) {
-                      final percent = (item.amount / total) * 100;
+                      final percent = total == 0
+                          ? 0
+                          : (item.amount / total) * 100;
 
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.only(bottom: 9),
                         child: Row(
                           children: [
                             Container(
@@ -449,19 +695,33 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
                                 shape: BoxShape.circle,
                               ),
                             ),
-
                             const SizedBox(width: 8),
-
                             Expanded(
-                              child: Text(
-                                item.categoryName,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    item.categoryName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  Text(
+                                    item.amount.toCurrency(),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      fontSize: 10,
+                                      color: Color(0xFF8A6B79),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
-
                             Text(
                               '%${percent.toStringAsFixed(0)}',
                               style: const TextStyle(
@@ -493,42 +753,4 @@ class CategoryExpenseChartItem {
   final String categoryName;
   final double amount;
   final Color color;
-}
-
-class ExpensePieChartPainter extends CustomPainter {
-  ExpensePieChartPainter(this.items);
-
-  final List<CategoryExpenseChartItem> items;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final total = items.fold<double>(0, (sum, item) => sum + item.amount);
-
-    if (total <= 0) {
-      return;
-    }
-
-    final rect = Offset.zero & size;
-    double startAngle = -1.5708;
-
-    final paint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 28
-      ..strokeCap = StrokeCap.round;
-
-    for (final item in items) {
-      final sweepAngle = (item.amount / total) * 6.28318;
-
-      paint.color = item.color;
-
-      canvas.drawArc(rect.deflate(18), startAngle, sweepAngle, false, paint);
-
-      startAngle += sweepAngle;
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant ExpensePieChartPainter oldDelegate) {
-    return oldDelegate.items != items;
-  }
 }

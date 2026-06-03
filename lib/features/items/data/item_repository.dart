@@ -64,25 +64,17 @@ class ItemRepository {
     return (_database.update(
       _database.items,
     )..where((tbl) => tbl.id.equals(item.id))).write(
-      ItemsCompanion(
-        isPurchased: const Value(false),
-        purchaseDate: const Value.absent(),
-        updateAt: Value(DateTime.now().millisecondsSinceEpoch),
+      const ItemsCompanion(
+        isPurchased: Value(false),
+        purchasedPrice: Value(null),
+        purchaseDate: Value(null),
+        imagePath: Value(null),
+        link: Value(null),
       ),
     );
   }
 
   Future<int> undoPurchased(Item item) {
-    return (_database.update(
-      _database.items,
-    )..where((tbl) => tbl.id.equals(item.id))).write(
-      const ItemsCompanion(
-        isPurchased: Value(false),
-        purchasedPrice: Value(null),
-        purchaseDate: Value(null),
-        brand: Value(null),
-        model: Value(null),
-      ),
-    );
+    return markAsNotPurchased(item);
   }
 }
