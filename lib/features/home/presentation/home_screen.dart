@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
@@ -5,6 +6,8 @@ import 'package:flutter_startup_app/core/database/database_provider.dart';
 import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
 import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
 import 'package:flutter_startup_app/core/notifications/notification_planner_service.dart';
+import 'package:flutter_startup_app/features/auth/data/auth_providers.dart';
+import 'package:flutter_startup_app/features/auth/data/auth_service.dart';
 import 'package:flutter_startup_app/features/categories/presentation/category_detail_screen.dart';
 import 'package:flutter_startup_app/features/expenses/presentation/expense_detail_screen.dart';
 import 'package:flutter_startup_app/features/export/data/excel_export_service.dart';
@@ -16,7 +19,6 @@ import 'package:flutter_startup_app/features/items/presentation/planned_items_sc
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
 import 'package:flutter_startup_app/features/templates/data/ceyiz_templates.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
-import 'package:flutter_startup_app/features/auth/data/auth_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -48,6 +50,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authStateProvider);
+    final currentUser = authState.value;
     final allItemsAsync = ref.watch(allItemsProvider);
     final groupedItemsAsync = ref.watch(groupedItemsProvider);
 
@@ -77,9 +81,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   allItemsAsync.when(
-                    loading: () => _buildHeader([]),
-                    error: (_, _) => _buildHeader([]),
-                    data: (allItems) => _buildHeader(allItems),
+                    loading: () => _buildHeader([],currentUser),
+                    error: (_, _) => _buildHeader([],currentUser),
+                    data: (allItems) => _buildHeader(allItems,currentUser),
                   ),
                   const SizedBox(height: 14),
                   allItemsAsync.when(
@@ -135,7 +139,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildHeader(List<Item> allItems) {
+  Widget _buildHeader(List<Item> allItems, User? user) {
+    final isAnonymous = user?.isAnonymous ?? true;
+
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
       decoration: BoxDecoration(
@@ -207,23 +213,42 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 );
               }
 
-              if (!mounted) {
-                return;
+              if (value == 'google_login') {
+                try {
+                  await AuthService.signInWithGoogle();
+
+                  if (!mounted) {
+                    return;
+                  }
+
+                  ref.invalidate(authStateProvider);
+                  
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Google hesabı ile giriş yapıldı.'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                } catch (error) {
+                  if (!mounted) {
+                    return;
+                  }
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Google giriş hatası: $error'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
               }
 
               if (value == 'logout') {
                 await AuthService.signOut();
               }
-
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Firebase test kaydı oluşturuldu'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
             },
-            itemBuilder: (context) => const [
-              PopupMenuItem(
+            itemBuilder: (context) => [
+              const PopupMenuItem(
                 value: 'excel',
                 child: Row(
                   children: [
@@ -233,16 +258,29 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ],
                 ),
               ),
-              PopupMenuItem(
-                value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(Icons.logout_rounded),
-                    SizedBox(width: 10),
-                    Text('Çıkış Yap'),
-                  ],
+
+              if (isAnonymous)
+                const PopupMenuItem(
+                  value: 'google_login',
+                  child: Row(
+                    children: [
+                      Icon(Icons.login_rounded),
+                      SizedBox(width: 10),
+                      Text('Google Hesabına Geç'),
+                    ],
+                  ),
+                )
+              else
+                const PopupMenuItem(
+                  value: 'logout',
+                  child: Row(
+                    children: [
+                      Icon(Icons.logout_rounded),
+                      SizedBox(width: 10),
+                      Text('Çıkış Yap'),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
         ],

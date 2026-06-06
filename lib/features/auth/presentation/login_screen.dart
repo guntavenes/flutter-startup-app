@@ -44,20 +44,15 @@ class LoginScreen extends StatelessWidget {
                       try {
                         final result = await AuthService.signInWithGoogle();
 
-                        if (result == null) {
-                          return;
-                        }
-                      } catch (error) {
-                        if (!context.mounted) {
-                          return;
-                        }
+                        debugPrint('Google Login Result: $result');
+                      } catch (e) {
+                        debugPrint('Google Login Error: $e');
 
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Google giriş hatası: $error'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(
+                            context,
+                          ).showSnackBar(SnackBar(content: Text('Hata: $e')));
+                        }
                       }
                     },
                     icon: const Icon(Icons.login_rounded),
