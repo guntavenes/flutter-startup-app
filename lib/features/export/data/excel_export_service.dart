@@ -1,10 +1,11 @@
-import 'dart:typed_data';
+import 'dart:io';
 
 import 'package:excel/excel.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
 import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
+import 'package:media_store_plus/media_store_plus.dart';
+import 'package:path_provider/path_provider.dart';
 
 class ExcelExportService {
   ExcelExportService._();
@@ -55,13 +56,23 @@ class ExcelExportService {
       return null;
     }
 
-    final fileName = 'ceyiz_listesi_${DateTime.now().millisecondsSinceEpoch}';
+    final directory = await getTemporaryDirectory();
 
-    return FileSaver.instance.saveFile(
-      name: fileName,
-      bytes: Uint8List.fromList(bytes),
-      ext: 'xlsx',
-      mimeType: MimeType.microsoftExcel,
+    final fileName =
+        'ceyiz_listesi_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+
+    final tempFile = File('${directory.path}/$fileName');
+
+    await tempFile.writeAsBytes(bytes);
+
+    final mediaStore = MediaStore();
+
+    final saveInfo = await mediaStore.saveFile(
+      tempFilePath: tempFile.path,
+      dirType: DirType.download,
+      dirName: DirName.download,
     );
+
+    return saveInfo?.uri.toString();
   }
 }

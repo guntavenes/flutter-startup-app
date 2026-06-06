@@ -9,7 +9,6 @@ import 'package:flutter_startup_app/core/formatters/turkish_currency_input_forma
 import 'package:flutter_startup_app/features/brands/data/brand_options.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
-import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_detail_screen.dart';
 
 class CategoryDetailScreen extends ConsumerStatefulWidget {
@@ -142,7 +141,8 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                             final result = await Navigator.of(context)
                                 .push<bool>(
                                   MaterialPageRoute(
-                                    builder: (_) => ItemDetailScreen(item: item),
+                                    builder: (_) =>
+                                        ItemDetailScreen(item: item),
                                   ),
                                 );
 
@@ -253,15 +253,22 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         .fold<double>(0, (sum, item) => sum + (item.purchasedPrice ?? 0));
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [Color(0xFFFF8DBA), Color(0xFFD96BA7)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(26),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD96BA7).withValues(alpha: 0.15),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,31 +276,35 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
           Text(
             widget.category.name,
             style: const TextStyle(
-              fontSize: 20,
+              fontSize: 18,
               fontWeight: FontWeight.w900,
+              letterSpacing: -0.3,
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           Text(
-            '${items.length} ürün • $purchasedCount alındı • $remainingCount kalan',
+            '$purchasedCount alındı • $remainingCount kalan',
             style: const TextStyle(
+              fontSize: 13,
               color: Colors.white,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(16),
             ),
             child: Text(
               totalExpense.toCurrency(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontSize: 22,
+                fontSize: 18,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
               ),

@@ -6,11 +6,15 @@ import 'package:flutter_startup_app/features/home/presentation/home_screen.dart'
 import 'package:flutter_startup_app/features/items/domain/planned_item_filter.dart';
 import 'package:flutter_startup_app/features/items/presentation/planned_items_screen.dart';
 import 'package:workmanager/workmanager.dart';
+import 'package:media_store_plus/media_store_plus.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  MediaStore.ensureInitialized();
+  MediaStore.appFolder = 'Ceyiz Takip';
 
   await NotificationService.initialize();
 

@@ -1,5 +1,4 @@
 import 'dart:io';
-
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,8 +9,8 @@ import 'package:flutter_startup_app/features/brands/data/brand_options.dart';
 import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
-import 'package:flutter_startup_app/features/items/presentation/image_crop_screen.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_startup_app/core/formatters/title_case_text_formatter.dart';
 
 class ItemFormScreen extends ConsumerStatefulWidget {
   const ItemFormScreen({super.key, this.item});
@@ -301,6 +300,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                     label: 'Ürün adı',
                     icon: Icons.shopping_bag_outlined,
                     isRequired: true,
+                    inputFormatters: [TitleCaseTextFormatter()],
                   ),
                   const SizedBox(height: 14),
                   categoriesAsync.when(
@@ -324,6 +324,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                     controller: _modelController,
                     label: 'Model',
                     icon: Icons.category_outlined,
+                    inputFormatters: [TitleCaseTextFormatter()],
                   ),
                   const SizedBox(height: 14),
                   _buildPurchasedSwitch(),
@@ -403,52 +404,76 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
   }
 
   Widget _buildCategoryDropdown(List<Category> categories) {
-    return DropdownButtonFormField<int>(
+    final selectedCategory = categories
+        .where((category) => category.id == _selectedCategoryId)
+        .firstOrNull;
+
+    return FormField<int>(
       initialValue: _selectedCategoryId,
-      validator: (value) {
-        if (value == null) {
+      validator: (_) {
+        if (_selectedCategoryId == null) {
           return 'Kategori seçmelisin';
         }
 
         return null;
       },
-      decoration: InputDecoration(
-        labelText: 'Kategori',
-        prefixIcon: const Icon(
-          Icons.category_outlined,
-          color: Color(0xFFD96BA7),
-        ),
-        filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.92),
-        contentPadding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 18,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.7)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: Color(0xFFD96BA7), width: 1.4),
-        ),
-      ),
-      items: categories.map((category) {
-        return DropdownMenuItem<int>(
-          value: category.id,
-          child: Text(category.name),
+      builder: (field) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildSelectorField(
+              label: 'Kategori',
+              value: selectedCategory?.name ?? 'Kategori seçiniz',
+              icon: Icons.category_outlined,
+              errorText: field.errorText,
+              onTap: () => _showCategoryBottomSheet(categories, field),
+            ),
+            if (field.errorText != null) ...[
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.only(left: 18),
+                child: Text(
+                  field.errorText!,
+                  style: const TextStyle(
+                    color: Colors.redAccent,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ],
+          ],
         );
-      }).toList(),
-      onChanged: (value) {
-        setState(() {
-          _selectedCategoryId = value;
-          _selectedBrand = null;
-          _brandController.clear();
-        });
+      },
+    );
+  }
+
+  void _showCategoryBottomSheet(
+    List<Category> categories,
+    FormFieldState<int> field,
+  ) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        return _buildOptionSheet<Category>(
+          title: 'Kategori Seç',
+          items: categories,
+          selectedItem: categories
+              .where((category) => category.id == _selectedCategoryId)
+              .firstOrNull,
+          getTitle: (category) => category.name,
+          onSelected: (category) {
+            setState(() {
+              _selectedCategoryId = category.id;
+              _selectedBrand = null;
+              _brandController.clear();
+            });
+
+            field.didChange(category.id);
+            Navigator.of(context).pop();
+          },
+        );
       },
     );
   }
@@ -466,6 +491,12 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
       controller: controller,
       keyboardType: keyboardType,
       maxLines: maxLines,
+      inputFormatters: inputFormatters,
+      style: const TextStyle(
+        fontSize: 16,
+        fontWeight: FontWeight.w900,
+        color: Color(0xFF2C1E26),
+      ),
       validator: isRequired
           ? (value) {
               if (value == null || value.trim().isEmpty) {
@@ -475,27 +506,116 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
               return null;
             }
           : null,
-      inputFormatters: inputFormatters,
       decoration: InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, color: const Color(0xFFD96BA7)),
+
+        labelStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFFD96BA7),
+        ),
+
+        floatingLabelStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          color: Color(0xFFD96BA7),
+        ),
+
+        prefixIcon: Icon(icon, color: const Color(0xFFD96BA7), size: 22),
+
         filled: true,
-        fillColor: Colors.white.withValues(alpha: 0.92),
+        fillColor: Colors.white.withValues(alpha: 0.95),
+
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 18,
         ),
+
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
           borderSide: BorderSide.none,
         ),
+
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
-          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.7)),
+          borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.8)),
         ),
+
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(24),
-          borderSide: const BorderSide(color: Color(0xFFD96BA7), width: 1.4),
+          borderSide: const BorderSide(color: Color(0xFFD96BA7), width: 1.2),
+        ),
+
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(24),
+          borderSide: const BorderSide(color: Colors.redAccent),
+        ),
+
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(24),
+          borderSide: const BorderSide(color: Colors.redAccent, width: 1.2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectorField({
+    required String label,
+    required String value,
+    required IconData icon,
+    required VoidCallback onTap,
+    String? errorText,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.fromLTRB(18, 10, 14, 10),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.95),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: errorText == null
+                ? Colors.white.withValues(alpha: 0.8)
+                : Colors.redAccent,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: const Color(0xFFD96BA7), size: 22),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFFD96BA7),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF2C1E26),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              Icons.keyboard_arrow_down_rounded,
+              color: Color(0xFF8A6B79),
+            ),
+          ],
         ),
       ),
     );
@@ -510,39 +630,15 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
         ? [BrandOptions.other]
         : BrandOptions.getBrands(selectedCategory.name);
 
-    final dropdownValue = brandOptions.contains(_selectedBrand)
-        ? _selectedBrand
-        : null;
+    final selectedBrandText = _selectedBrand ?? 'Marka seçiniz';
 
     return Column(
       children: [
-        DropdownButtonFormField<String>(
-          initialValue: dropdownValue,
-          hint: const Text('Marka seçiniz'),
-          decoration: InputDecoration(
-            prefixIcon: const Icon(
-              Icons.sell_outlined,
-              color: Color(0xFFD96BA7),
-            ),
-            filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.92),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(24),
-              borderSide: BorderSide.none,
-            ),
-          ),
-          items: brandOptions.map((brand) {
-            return DropdownMenuItem<String>(value: brand, child: Text(brand));
-          }).toList(),
-          onChanged: (value) {
-            setState(() {
-              _selectedBrand = value;
-
-              if (_selectedBrand != BrandOptions.other) {
-                _brandController.clear();
-              }
-            });
-          },
+        _buildSelectorField(
+          label: 'Marka',
+          value: selectedBrandText,
+          icon: Icons.sell_outlined,
+          onTap: () => _showBrandBottomSheet(brandOptions),
         ),
         if (_selectedBrand == BrandOptions.other) ...[
           const SizedBox(height: 14),
@@ -550,6 +646,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
             controller: _brandController,
             label: 'Diğer Marka',
             icon: Icons.edit_outlined,
+            inputFormatters: [TitleCaseTextFormatter()],
           ),
         ],
       ],
@@ -600,6 +697,131 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
               ),
             ),
             const Icon(Icons.calendar_month_outlined, color: Color(0xFF8A6B79)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBrandBottomSheet(List<String> brandOptions) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) {
+        return _buildOptionSheet<String>(
+          title: 'Marka Seç',
+          items: brandOptions,
+          selectedItem: _selectedBrand,
+          getTitle: (brand) => brand,
+          onSelected: (brand) {
+            setState(() {
+              _selectedBrand = brand;
+
+              if (_selectedBrand != BrandOptions.other) {
+                _brandController.clear();
+              }
+            });
+
+            Navigator.of(context).pop();
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildOptionSheet<T>({
+    required String title,
+    required List<T> items,
+    required T? selectedItem,
+    required String Function(T item) getTitle,
+    required void Function(T item) onSelected,
+  }) {
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.72,
+      ),
+      padding: const EdgeInsets.fromLTRB(18, 10, 18, 18),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFF5FA),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Color(0xFFD6C2CC),
+                borderRadius: BorderRadius.circular(100),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF2C1E26),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Flexible(
+              child: ListView.builder(
+                shrinkWrap: true,
+                itemCount: items.length,
+                itemBuilder: (context, index) {
+                  final item = items[index];
+                  final isSelected = item == selectedItem;
+
+                  return GestureDetector(
+                    onTap: () => onSelected(item),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 13,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? const Color(0xFFFFE3F0)
+                            : Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: isSelected
+                              ? const Color(0xFFD96BA7)
+                              : const Color(0xFFFFE3F0),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              getTitle(item),
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: isSelected
+                                    ? const Color(0xFFD96BA7)
+                                    : const Color(0xFF2C1E26),
+                              ),
+                            ),
+                          ),
+                          if (isSelected)
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              color: Color(0xFFD96BA7),
+                            ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
           ],
         ),
       ),
@@ -695,38 +917,40 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
   Widget _buildFormHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFFFF8DBA), Color(0xFFD96BA7), Color(0xFFFFB6D5)],
+          colors: [Color(0xFFFF8DBA), Color(0xFFD96BA7)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(30),
+        borderRadius: BorderRadius.circular(22),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFD96BA7).withValues(alpha: 0.25),
-            blurRadius: 26,
-            offset: const Offset(0, 12),
+            color: const Color(0xFFD96BA7).withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Row(
         children: [
           Container(
-            width: 56,
-            height: 56,
+            width: 46,
+            height: 46,
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.25),
-              borderRadius: BorderRadius.circular(22),
+              color: Colors.white.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(15),
             ),
-            child: const Icon(
-              Icons.add_shopping_cart_outlined,
+            child: Icon(
+              _isEditMode
+                  ? Icons.edit_note_rounded
+                  : Icons.add_shopping_cart_outlined,
               color: Colors.white,
-              size: 30,
+              size: 26,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -734,17 +958,23 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                 Text(
                   _isEditMode ? 'Ürünü Düzenle' : 'Yeni Ürün',
                   style: const TextStyle(
-                    fontSize: 26,
+                    fontSize: 20,
+                    height: 1.1,
                     fontWeight: FontWeight.w900,
+                    letterSpacing: -0.3,
                     color: Colors.white,
                   ),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: 4),
                 Text(
                   _isEditMode
-                      ? 'Ürün bilgilerini güncelle veya ürünü listenden kaldır.'
-                      : 'Çeyiz listene yeni bir ihtiyaç veya alınan ürün ekle.',
+                      ? 'Ürün bilgilerini güncelle.'
+                      : 'Listene yeni bir ürün ekle.',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
+                    fontSize: 13,
+                    height: 1.25,
                     color: Colors.white70,
                     fontWeight: FontWeight.w600,
                   ),
@@ -756,6 +986,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
       ),
     );
   }
+
 
   Widget _buildSaveButton() {
     return SizedBox(
@@ -784,27 +1015,17 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
 
     final pickedFile = await picker.pickImage(
       source: source,
-      imageQuality: 85,
-      maxWidth: 2000,
-      maxHeight: 2000,
+      imageQuality: 70,
+      maxWidth: 1000,
+      maxHeight: 1000,
     );
 
-    if (pickedFile == null || !mounted) {
-      return;
-    }
-
-    final croppedImagePath = await Navigator.of(context).push<String>(
-      MaterialPageRoute(
-        builder: (_) => ImageCropScreen(imagePath: pickedFile.path),
-      ),
-    );
-
-    if (croppedImagePath == null || !mounted) {
+    if (pickedFile == null) {
       return;
     }
 
     setState(() {
-      _selectedImagePath = croppedImagePath;
+      _selectedImagePath = pickedFile.path;
     });
   }
 
@@ -916,6 +1137,8 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                         Positioned.fill(
                           child: Image.file(
                             File(_selectedImagePath!),
+                            width: double.infinity,
+                            height: double.infinity,
                             fit: BoxFit.cover,
                             cacheWidth: 800,
                             cacheHeight: 500,

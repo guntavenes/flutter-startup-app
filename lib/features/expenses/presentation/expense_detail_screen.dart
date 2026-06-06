@@ -447,44 +447,169 @@ class _ExpenseDetailScreenState extends ConsumerState<ExpenseDetailScreen> {
   Widget _buildSortBar() {
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
-      child: DropdownButtonFormField<ExpenseSortType>(
-        initialValue: _sortType,
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: Colors.white,
-          labelText: 'Sıralama',
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(22),
-            borderSide: BorderSide.none,
+      child: GestureDetector(
+        onTap: _showSortBottomSheet,
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: const Color(0xFFFFE3F0)),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFFD96BA7).withValues(alpha: 0.08),
+                blurRadius: 14,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.sort_rounded, color: Color(0xFFD96BA7)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  _getSortTitle(_sortType),
+                  style: const TextStyle(
+                    color: Color(0xFF2C1E26),
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: Color(0xFF8A6B79),
+              ),
+            ],
           ),
         ),
-        items: const [
-          DropdownMenuItem(
-            value: ExpenseSortType.dateDesc,
-            child: Text('En Yeni Ürünler'),
-          ),
-          DropdownMenuItem(
-            value: ExpenseSortType.dateAsc,
-            child: Text('En Eski Ürünler'),
-          ),
-          DropdownMenuItem(
-            value: ExpenseSortType.priceDesc,
-            child: Text('En Yüksek Fiyat'),
-          ),
-          DropdownMenuItem(
-            value: ExpenseSortType.priceAsc,
-            child: Text('En Düşük Fiyat'),
-          ),
-        ],
-        onChanged: (value) {
-          if (value == null) return;
-
-          setState(() {
-            _sortType = value;
-          });
-        },
       ),
     );
+  }
+
+  void _showSortBottomSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.fromLTRB(18, 12, 18, 24),
+          decoration: const BoxDecoration(
+            color: Color(0xFFFFF5FA),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 44,
+                height: 5,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD6C2CC),
+                  borderRadius: BorderRadius.circular(100),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Sıralama',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF2C1E26),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildSortOption(ExpenseSortType.dateDesc),
+              _buildSortOption(ExpenseSortType.dateAsc),
+              _buildSortOption(ExpenseSortType.priceDesc),
+              _buildSortOption(ExpenseSortType.priceAsc),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildSortOption(ExpenseSortType sortType) {
+    final isSelected = _sortType == sortType;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _sortType = sortType;
+        });
+
+        Navigator.of(context).pop();
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFFFE3F0) : Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: isSelected
+                ? const Color(0xFFD96BA7)
+                : const Color(0xFFFFE3F0),
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              _getSortIcon(sortType),
+              color: isSelected
+                  ? const Color(0xFFD96BA7)
+                  : const Color(0xFF8A6B79),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                _getSortTitle(sortType),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: isSelected
+                      ? const Color(0xFFD96BA7)
+                      : const Color(0xFF2C1E26),
+                ),
+              ),
+            ),
+            if (isSelected)
+              const Icon(Icons.check_circle_rounded, color: Color(0xFFD96BA7)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getSortTitle(ExpenseSortType sortType) {
+    switch (sortType) {
+      case ExpenseSortType.dateDesc:
+        return 'En Yeni Ürünler';
+      case ExpenseSortType.dateAsc:
+        return 'En Eski Ürünler';
+      case ExpenseSortType.priceDesc:
+        return 'En Yüksek Fiyat';
+      case ExpenseSortType.priceAsc:
+        return 'En Düşük Fiyat';
+    }
+  }
+
+  IconData _getSortIcon(ExpenseSortType sortType) {
+    switch (sortType) {
+      case ExpenseSortType.dateDesc:
+        return Icons.calendar_month_rounded;
+      case ExpenseSortType.dateAsc:
+        return Icons.event_available_rounded;
+      case ExpenseSortType.priceDesc:
+        return Icons.trending_up_rounded;
+      case ExpenseSortType.priceAsc:
+        return Icons.trending_down_rounded;
+    }
   }
 
   Widget _buildExpenseCard(Item item) {

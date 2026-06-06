@@ -190,7 +190,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   items: allItems,
                 );
 
-                if (!context.mounted) {
+                if (!mounted) {
                   return;
                 }
 
