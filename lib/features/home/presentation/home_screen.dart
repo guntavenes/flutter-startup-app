@@ -7,6 +7,7 @@ import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
 import 'package:flutter_startup_app/core/notifications/notification_planner_service.dart';
 import 'package:flutter_startup_app/features/categories/presentation/category_detail_screen.dart';
 import 'package:flutter_startup_app/features/expenses/presentation/expense_detail_screen.dart';
+import 'package:flutter_startup_app/features/export/data/excel_export_service.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/domain/planned_item_filter.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
@@ -15,7 +16,7 @@ import 'package:flutter_startup_app/features/items/presentation/planned_items_sc
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
 import 'package:flutter_startup_app/features/templates/data/ceyiz_templates.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
-import 'package:flutter_startup_app/features/export/data/excel_export_service.dart';
+import 'package:flutter_startup_app/features/auth/data/auth_service.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -205,6 +206,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 );
               }
+
+              if (!mounted) {
+                return;
+              }
+
+              if (value == 'logout') {
+                await AuthService.signOut();
+              }
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Firebase test kaydı oluşturuldu'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
             },
             itemBuilder: (context) => const [
               PopupMenuItem(
@@ -214,6 +230,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     Icon(Icons.table_chart_outlined),
                     SizedBox(width: 10),
                     Text('Excel Olarak Dışa Aktar'),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout_rounded),
+                    SizedBox(width: 10),
+                    Text('Çıkış Yap'),
                   ],
                 ),
               ),
