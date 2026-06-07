@@ -73,7 +73,7 @@ class LoginScreen extends StatelessWidget {
                   height: 54,
                   child: OutlinedButton.icon(
                     onPressed: () async {
-                      await FirebaseAuth.instance.signInAnonymously();
+                      await AuthService.signInAnonymously();
                     },
                     icon: const Icon(Icons.person_outline_rounded),
                     label: const Text('Misafir Olarak Devam Et'),
