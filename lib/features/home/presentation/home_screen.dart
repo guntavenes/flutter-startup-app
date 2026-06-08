@@ -81,9 +81,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   allItemsAsync.when(
-                    loading: () => _buildHeader([],currentUser),
-                    error: (_, _) => _buildHeader([],currentUser),
-                    data: (allItems) => _buildHeader(allItems,currentUser),
+                    loading: () => _buildHeader([], currentUser),
+                    error: (_, _) => _buildHeader([], currentUser),
+                    data: (allItems) => _buildHeader(allItems, currentUser),
                   ),
                   const SizedBox(height: 14),
                   allItemsAsync.when(
@@ -215,14 +215,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
               if (value == 'google_login') {
                 try {
-                  await AuthService.signInWithGoogle();
+                  await AuthService.linkAnonymousUserWithGoogle();
 
                   if (!mounted) {
                     return;
                   }
 
                   ref.invalidate(authStateProvider);
-                  
+
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text('Google hesabı ile giriş yapıldı.'),

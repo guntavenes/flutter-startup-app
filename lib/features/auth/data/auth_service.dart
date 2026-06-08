@@ -46,6 +46,60 @@ class AuthService {
     return userCredential;
   }
 
+  static Future<UserCredential?> linkAnonymousUserWithGoogle() async {
+    await _ensureGoogleSignInInitialized();
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser == null || !currentUser.isAnonymous) {
+      return signInWithGoogle();
+    }
+
+    try {
+      final googleUser = await GoogleSignIn.instance.authenticate();
+      final googleAuth = googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await currentUser.linkWithCredential(credential);
+
+      await _createOrUpdateUserDocument(userCredential.user);
+
+      return userCredential;
+    } on FirebaseAuthException catch (error) {
+      if (error.code == 'credential-already-in-use' &&
+          error.credential != null) {
+        final userCredential = await FirebaseAuth.instance.signInWithCredential(
+          error.credential!,
+        );
+
+        await _createOrUpdateUserDocument(userCredential.user);
+
+        return userCredential;
+      }
+
+      rethrow;
+    } on GoogleSignInException catch (error) {
+      if (error.code == GoogleSignInExceptionCode.canceled) {
+        return null;
+      }
+
+      rethrow;
+    }
+  }
+
+  static Future<UserCredential?> continueWithGoogle() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser != null && currentUser.isAnonymous) {
+      return linkAnonymousUserWithGoogle();
+    }
+
+    return signInWithGoogle();
+  }
+
   static Future<void> _createOrUpdateUserDocument(User? user) async {
     if (user == null) return;
 
