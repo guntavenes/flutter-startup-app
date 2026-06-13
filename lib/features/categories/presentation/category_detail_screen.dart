@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
 import 'package:flutter_startup_app/core/formatters/turkish_currency_input_formatter.dart';
-import 'package:flutter_startup_app/features/brands/data/brand_options.dart';
+import 'package:flutter_startup_app/features/brands/data/brand_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_detail_screen.dart';
@@ -521,13 +521,15 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
 
     final brandController = TextEditingController(text: item.brand ?? '');
 
-    final brandOptions = BrandOptions.getBrands(widget.category.name);
+    final brandOptions = await ref.read(
+      brandsByCategoryProvider(widget.category.name).future,
+    );
 
     String? selectedBrand = brandOptions.contains(item.brand)
         ? item.brand
         : null;
 
-    if (selectedBrand != BrandOptions.other) {
+    if (selectedBrand != 'Diğer') {
       brandController.clear();
     }
 
@@ -564,13 +566,13 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                       setDialogState(() {
                         selectedBrand = value;
 
-                        if (selectedBrand != BrandOptions.other) {
+                        if (selectedBrand != 'Diğer') {
                           brandController.clear();
                         }
                       });
                     },
                   ),
-                  if (selectedBrand == BrandOptions.other) ...[
+                  if (selectedBrand == 'Diğer') ...[
                     const SizedBox(height: 10),
                     TextField(
                       controller: brandController,
@@ -634,7 +636,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                     Navigator.of(dialogContext).pop(
                       PurchaseInfoResult(
                         price: price,
-                        brand: selectedBrand == BrandOptions.other
+                        brand: selectedBrand == 'Diğer'
                             ? _formatBrand(brandController.text)
                             : selectedBrand,
                         purchaseDate: selectedDate.millisecondsSinceEpoch,

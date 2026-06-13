@@ -1,0 +1,28 @@
+PODS:
+  - file_saver (0.0.1):
+    - Flutter
+  - Flutter (1.0.0)
+  - workmanager_apple (0.0.1):
+    - Flutter
+
+DEPENDENCIES:
+  - file_saver (from `.symlinks/plugins/file_saver/ios`)
+  - Flutter (from `Flutter`)
+  - workmanager_apple (from `.symlinks/plugins/workmanager_apple/ios`)
+
+EXTERNAL SOURCES:
+  file_saver:
+    :path: ".symlinks/plugins/file_saver/ios"
+  Flutter:
+    :path: Flutter
+  workmanager_apple:
+    :path: ".symlinks/plugins/workmanager_apple/ios"
+
+SPEC CHECKSUMS:
+  file_saver: 6cdbcddd690cb02b0c1a0c225b37cd805c2bf8b6
+  Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
+  workmanager_apple: 904529ae31e97fc5be632cf628507652294a0778
+
+PODFILE CHECKSUM: 3d68f7cb47d5f2fb7765407f663653c9b51100f3
+
+COCOAPODS: 1.16.2

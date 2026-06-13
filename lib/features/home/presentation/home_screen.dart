@@ -12,12 +12,12 @@ import 'package:flutter_startup_app/features/categories/presentation/category_de
 import 'package:flutter_startup_app/features/expenses/presentation/expense_detail_screen.dart';
 import 'package:flutter_startup_app/features/export/data/excel_export_service.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
+import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:flutter_startup_app/features/items/domain/planned_item_filter.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_list_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/planned_items_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
-import 'package:flutter_startup_app/features/templates/data/ceyiz_templates.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -31,6 +31,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   void initState() {
     super.initState();
+
+    Future.microtask(() async {
+      final repository = ref.read(itemRepositoryProvider);
+
+      await repository.syncItemsFromFirestore();
+
+      ref.invalidate(allItemsProvider);
+
+      ref.invalidate(groupedItemsProvider);
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
@@ -1094,20 +1104,19 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildTemplateCard() {
     return GestureDetector(
       onTap: () async {
-        final result = await Navigator.of(context).push<Map<String, int>>(
+        final result = await Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => TemplatePreviewScreen(
-              title: CeyizTemplates.title,
-              items: CeyizTemplates.items,
-            ),
+            builder: (_) =>
+                const TemplatePreviewScreen(title: 'Hazır Çeyiz Şablonu'),
           ),
         );
 
-        if (result == null) {
-          return;
+        if (result != null && context.mounted) {
+          Future.microtask(() {
+            ref.invalidate(allItemsProvider);
+            ref.invalidate(groupedItemsProvider);
+          });
         }
-
-        ref.invalidate(allItemsProvider);
 
         final addedCount = result['addedCount'] ?? 0;
         final skippedCount = result['skippedCount'] ?? 0;

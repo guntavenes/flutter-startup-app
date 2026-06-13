@@ -13,6 +13,7 @@ final categoriesProvider = FutureProvider<List<Category>>((ref) async {
   final repo = ref.watch(categoryRepositoryProvider);
 
   await repo.insertDefaultCategories();
+  await repo.syncCategoriesFromFirestore();
 
   return repo.getAll();
 });

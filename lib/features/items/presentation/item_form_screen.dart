@@ -5,12 +5,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/core/formatters/turkish_currency_input_formatter.dart';
-import 'package:flutter_startup_app/features/brands/data/brand_options.dart';
 import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_startup_app/core/formatters/title_case_text_formatter.dart';
+import 'package:flutter_startup_app/features/brands/data/brand_providers.dart';
 
 class ItemFormScreen extends ConsumerStatefulWidget {
   const ItemFormScreen({super.key, this.item});
@@ -176,7 +176,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
       return null;
     }
 
-    if (_selectedBrand != BrandOptions.other) {
+    if (_selectedBrand != 'Diğer') {
       return _selectedBrand;
     }
 
@@ -626,21 +626,45 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
         .where((category) => category.id == _selectedCategoryId)
         .firstOrNull;
 
-    final brandOptions = selectedCategory == null
-        ? [BrandOptions.other]
-        : BrandOptions.getBrands(selectedCategory.name);
+    final brandsAsync = selectedCategory == null
+        ? null
+        : ref.watch(brandsByCategoryProvider(selectedCategory.name));
 
     final selectedBrandText = _selectedBrand ?? 'Marka seçiniz';
 
     return Column(
       children: [
-        _buildSelectorField(
-          label: 'Marka',
-          value: selectedBrandText,
-          icon: Icons.sell_outlined,
-          onTap: () => _showBrandBottomSheet(brandOptions),
-        ),
-        if (_selectedBrand == BrandOptions.other) ...[
+        brandsAsync == null
+            ? _buildSelectorField(
+                label: 'Marka',
+                value: selectedBrandText,
+                icon: Icons.sell_outlined,
+                onTap: () => _showBrandBottomSheet(['Diğer']),
+              )
+            : brandsAsync.when(
+                loading: () => _buildSelectorField(
+                  label: 'Marka',
+                  value: 'Markalar yükleniyor...',
+                  icon: Icons.sell_outlined,
+                  onTap: () {},
+                ),
+                error: (_, _) => _buildSelectorField(
+                  label: 'Marka',
+                  value: 'Marka seçiniz',
+                  icon: Icons.sell_outlined,
+                  onTap: () => _showBrandBottomSheet(['Diğer']),
+                ),
+                data: (brandOptions) {
+                  return _buildSelectorField(
+                    label: 'Marka',
+                    value: selectedBrandText,
+                    icon: Icons.sell_outlined,
+                    onTap: () => _showBrandBottomSheet(brandOptions),
+                  );
+                },
+              ),
+
+        if (_selectedBrand == 'Diğer') ...[
           const SizedBox(height: 14),
           _buildTextField(
             controller: _brandController,
@@ -717,7 +741,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
             setState(() {
               _selectedBrand = brand;
 
-              if (_selectedBrand != BrandOptions.other) {
+              if (_selectedBrand != 'Diğer') {
                 _brandController.clear();
               }
             });
@@ -986,7 +1010,6 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
       ),
     );
   }
-
 
   Widget _buildSaveButton() {
     return SizedBox(

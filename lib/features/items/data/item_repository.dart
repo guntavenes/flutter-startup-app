@@ -206,4 +206,58 @@ class ItemRepository {
       'syncedAt': FieldValue.serverTimestamp(),
     };
   }
+
+  Future<void> syncItemsFromFirestore() async {
+    final collection = _itemsCollection();
+    if (collection == null) return;
+
+    final snapshot = await collection.get();
+
+    final remoteIds = <int>{};
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+
+      final id = data['id'] as int;
+      remoteIds.add(id);
+
+      await _database
+          .into(_database.items)
+          .insertOnConflictUpdate(
+            ItemsCompanion(
+              id: Value(id),
+              categoryId: Value(data['categoryId'] as int),
+              name: Value(data['name'] as String),
+              brand: Value(data['brand'] as String?),
+              model: Value(data['model'] as String?),
+              link: Value(data['link'] as String?),
+              plannedPrice: Value((data['plannedPrice'] as num?)?.toDouble()),
+              purchasedPrice: Value(
+                (data['purchasedPrice'] as num?)?.toDouble(),
+              ),
+              purchaseDate: Value(data['purchaseDate'] as int?),
+              storeName: Value(data['storeName'] as String?),
+              note: Value(data['note'] as String?),
+              extraFeatures: Value(data['extraFeatures'] as String?),
+              imagePath: Value(data['imagePath'] as String?),
+              isPurchased: Value(data['isPurchased'] as bool? ?? false),
+              createdAt: Value(data['createdAt'] as int),
+              updateAt: Value(data['updateAt'] as int),
+              estimatedPurchaseDate: Value(
+                data['estimatedPurchaseDate'] as int?,
+              ),
+            ),
+          );
+    }
+
+    final localItems = await getAllItems();
+
+    for (final item in localItems) {
+      if (!remoteIds.contains(item.id)) {
+        await (_database.delete(
+          _database.items,
+        )..where((tbl) => tbl.id.equals(item.id))).go();
+      }
+    }
+  }
 }

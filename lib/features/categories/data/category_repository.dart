@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:drift/drift.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/database/app_database.dart';
@@ -61,5 +62,32 @@ class CategoryRepository {
     }
 
     await batch.commit();
+  }
+
+  Future<void> syncCategoriesFromFirestore() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final snapshot = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(user.uid)
+        .collection('categories')
+        .get();
+
+    if (snapshot.docs.isEmpty) return;
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+
+      await _db
+          .into(_db.categories)
+          .insertOnConflictUpdate(
+            CategoriesCompanion(
+              id: Value(data['id'] as int),
+              name: Value(data['name'] as String),
+              createdAt: Value(data['createdAt'] as int),
+            ),
+          );
+    }
   }
 }

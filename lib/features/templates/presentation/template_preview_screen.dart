@@ -4,18 +4,14 @@ import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
+import 'package:flutter_startup_app/features/templates/data/template_providers.dart';
 
 import '../domain/template_item.dart';
 
 class TemplatePreviewScreen extends ConsumerStatefulWidget {
-  const TemplatePreviewScreen({
-    super.key,
-    required this.title,
-    required this.items,
-  });
+  const TemplatePreviewScreen({super.key, required this.title});
 
   final String title;
-  final List<TemplateItem> items;
 
   @override
   ConsumerState<TemplatePreviewScreen> createState() =>
@@ -23,22 +19,16 @@ class TemplatePreviewScreen extends ConsumerStatefulWidget {
 }
 
 class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
-  late Set<TemplateItem> _selectedItems;
+  Set<TemplateItem> _selectedItems = {};
   final Set<String> _collapsedCategoryNames = {};
+  bool _initializedSelection = false;
 
   @override
   void initState() {
     super.initState();
-
-    _selectedItems = widget.items.toSet();
-
-    _collapsedCategoryNames.addAll(
-      widget.items.map((item) => item.categoryName).toSet(),
-    );
   }
 
   Future<void> _addSelectedItemsToList() async {
-    debugPrint('_addSelectedItemsToList başladı');
 
     if (_selectedItems.isEmpty) {
       debugPrint('Seçili item yok');
@@ -100,8 +90,6 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
 
     debugPrint('Ekleme tamamlandı. added=$addedCount skipped=$skippedCount');
 
-    ref.invalidate(allItemsProvider);
-
     if (!mounted) {
       return;
     }
@@ -113,12 +101,7 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final groupedItems = <String, List<TemplateItem>>{};
-
-    for (final item in widget.items) {
-      groupedItems.putIfAbsent(item.categoryName, () => []);
-      groupedItems[item.categoryName]!.add(item);
-    }
+    final templateItemsAsync = ref.watch(standardTemplateItemsProvider);
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFF5FA),
@@ -127,18 +110,48 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
         backgroundColor: const Color(0xFFFFF5FA),
         elevation: 0,
       ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
-              children: groupedItems.entries.map((entry) {
-                return _buildCategorySection(entry.key, entry.value);
-              }).toList(),
+      body: templateItemsAsync.when(
+        loading: () => const Center(child: CircularProgressIndicator()),
+        error: (error, _) => Center(
+          child: Text(
+            'Şablon yüklenemedi: $error',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF8A6B79),
+              fontWeight: FontWeight.w700,
             ),
           ),
-          _buildBottomButton(),
-        ],
+        ),
+        data: (items) {
+          if (!_initializedSelection) {
+            _selectedItems = items.toSet();
+            _collapsedCategoryNames.addAll(
+              items.map((item) => item.categoryName).toSet(),
+            );
+            _initializedSelection = true;
+          }
+
+          final groupedItems = <String, List<TemplateItem>>{};
+
+          for (final item in items) {
+            groupedItems.putIfAbsent(item.categoryName, () => []);
+            groupedItems[item.categoryName]!.add(item);
+          }
+
+          return Column(
+            children: [
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 100),
+                  children: groupedItems.entries.map((entry) {
+                    return _buildCategorySection(entry.key, entry.value);
+                  }).toList(),
+                ),
+              ),
+              _buildBottomButton(),
+            ],
+          );
+        },
       ),
     );
   }
