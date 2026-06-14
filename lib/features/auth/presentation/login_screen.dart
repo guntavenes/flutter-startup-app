@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_startup_app/features/auth/data/auth_service.dart';
 
 class LoginScreen extends StatelessWidget {

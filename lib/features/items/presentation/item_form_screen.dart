@@ -264,12 +264,18 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
         actions: _isEditMode
             ? [
                 IconButton(
-                  onPressed: _saveItem,
+                  onPressed: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    _saveItem();
+                  },
                   icon: const Icon(Icons.check_rounded),
                   tooltip: 'Güncelle',
                 ),
                 IconButton(
-                  onPressed: _confirmDeleteItem,
+                  onPressed: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                    _confirmDeleteItem();
+                  },
                   icon: const Icon(Icons.delete_outline_rounded),
                   tooltip: 'Sil',
                 ),
@@ -344,6 +350,10 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                       value: _purchaseDate,
                       icon: Icons.event_available_outlined,
                       onTap: () async {
+                        FocusManager.instance.primaryFocus?.unfocus();
+
+                        await Future.delayed(const Duration(milliseconds: 120));
+
                         final selectedDate = await _pickDate(_purchaseDate);
 
                         if (selectedDate == null) {
@@ -362,6 +372,10 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                       value: _estimatedPurchaseDate,
                       icon: Icons.event_note_outlined,
                       onTap: () async {
+                        FocusManager.instance.primaryFocus?.unfocus();
+
+                        await Future.delayed(const Duration(milliseconds: 120));
+
                         final selectedDate = await _pickDate(
                           _estimatedPurchaseDate,
                         );
@@ -426,7 +440,9 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
               value: selectedCategory?.name ?? 'Kategori seçiniz',
               icon: Icons.category_outlined,
               errorText: field.errorText,
-              onTap: () => _showCategoryBottomSheet(categories, field),
+              onTap: () => _closeKeyboardThen(() {
+                _showCategoryBottomSheet(categories, field);
+              }),
             ),
             if (field.errorText != null) ...[
               const SizedBox(height: 6),
@@ -639,31 +655,38 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                 label: 'Marka',
                 value: selectedBrandText,
                 icon: Icons.sell_outlined,
-                onTap: () => _showBrandBottomSheet(['Diğer']),
+                onTap: () => _closeKeyboardThen(() {
+                  _showBrandBottomSheet(['Diğer']);
+                }),
               )
             : brandsAsync.when(
                 loading: () => _buildSelectorField(
                   label: 'Marka',
                   value: 'Markalar yükleniyor...',
                   icon: Icons.sell_outlined,
-                  onTap: () {},
+                  onTap: () {
+                    FocusManager.instance.primaryFocus?.unfocus();
+                  },
                 ),
                 error: (_, _) => _buildSelectorField(
                   label: 'Marka',
                   value: 'Marka seçiniz',
                   icon: Icons.sell_outlined,
-                  onTap: () => _showBrandBottomSheet(['Diğer']),
+                  onTap: () => _closeKeyboardThen(() {
+                    _showBrandBottomSheet(['Diğer']);
+                  }),
                 ),
                 data: (brandOptions) {
                   return _buildSelectorField(
                     label: 'Marka',
                     value: selectedBrandText,
                     icon: Icons.sell_outlined,
-                    onTap: () => _showBrandBottomSheet(brandOptions),
+                    onTap: () => _closeKeyboardThen(() {
+                      _showBrandBottomSheet(brandOptions);
+                    }),
                   );
                 },
               ),
-
         if (_selectedBrand == 'Diğer') ...[
           const SizedBox(height: 14),
           _buildTextField(
@@ -675,6 +698,12 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
         ],
       ],
     );
+  }
+
+  void _closeKeyboardThen(VoidCallback action) {
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    Future.delayed(const Duration(milliseconds: 120), action);
   }
 
   Widget _buildDatePickerTile({
@@ -728,25 +757,166 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
   }
 
   void _showBrandBottomSheet(List<String> brandOptions) {
+    var filteredBrands = List<String>.from(brandOptions);
+
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (_) {
-        return _buildOptionSheet<String>(
-          title: 'Marka Seç',
-          items: brandOptions,
-          selectedItem: _selectedBrand,
-          getTitle: (brand) => brand,
-          onSelected: (brand) {
-            setState(() {
-              _selectedBrand = brand;
+      isScrollControlled: true,
+      builder: (bottomSheetContext) {
+        return StatefulBuilder(
+          builder: (context, setBottomSheetState) {
+            return Container(
+              margin: const EdgeInsets.all(14),
+              padding: EdgeInsets.only(
+                left: 18,
+                right: 18,
+                top: 16,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 18,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(30),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 28,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: SafeArea(
+                top: false,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(context).size.height * 0.78,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8D3DD),
+                          borderRadius: BorderRadius.circular(99),
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      const Text(
+                        'Marka Seç',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF2C1E26),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+                      TextField(
+                        autofocus: true,
+                        decoration: InputDecoration(
+                          hintText: 'Marka ara...',
+                          prefixIcon: const Icon(
+                            Icons.search_rounded,
+                            color: Color(0xFFD96BA7),
+                          ),
+                          filled: true,
+                          fillColor: const Color(0xFFFFF5FA),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                        onChanged: (value) {
+                          setBottomSheetState(() {
+                            final query = value.trim().toLowerCase();
 
-              if (_selectedBrand != 'Diğer') {
-                _brandController.clear();
-              }
-            });
+                            filteredBrands = brandOptions.where((brand) {
+                              return brand.toLowerCase().contains(query);
+                            }).toList();
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 14),
+                      Expanded(
+                        child: filteredBrands.isEmpty
+                            ? const Center(
+                                child: Text(
+                                  'Marka bulunamadı',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF8A6B79),
+                                  ),
+                                ),
+                              )
+                            : ListView.separated(
+                                itemCount: filteredBrands.length,
+                                separatorBuilder: (_, _) =>
+                                    const SizedBox(height: 8),
+                                itemBuilder: (context, index) {
+                                  final brand = filteredBrands[index];
+                                  final isSelected = _selectedBrand == brand;
 
-            Navigator.of(context).pop();
+                                  return Material(
+                                    color: isSelected
+                                        ? const Color(0xFFFFE3F1)
+                                        : const Color(0xFFFFF8FB),
+                                    borderRadius: BorderRadius.circular(18),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(18),
+                                      onTap: () {
+                                        setState(() {
+                                          _selectedBrand = brand;
+
+                                          if (brand != 'Diğer') {
+                                            _brandController.clear();
+                                          }
+                                        });
+
+                                        Navigator.of(bottomSheetContext).pop();
+                                      },
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 14,
+                                          vertical: 13,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Icon(
+                                              isSelected
+                                                  ? Icons.check_circle_rounded
+                                                  : Icons.sell_outlined,
+                                              color: isSelected
+                                                  ? const Color(0xFFD96BA7)
+                                                  : const Color(0xFF9A7A89),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Text(
+                                                brand,
+                                                style: TextStyle(
+                                                  fontWeight: isSelected
+                                                      ? FontWeight.w900
+                                                      : FontWeight.w700,
+                                                  color: const Color(
+                                                    0xFF2C1E26,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
           },
         );
       },
@@ -1016,7 +1186,10 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
       width: double.infinity,
       height: 56,
       child: ElevatedButton(
-        onPressed: _saveItem,
+        onPressed: () {
+          FocusManager.instance.primaryFocus?.unfocus();
+          _saveItem();
+        },
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFFD96BA7),
           foregroundColor: Colors.white,
@@ -1125,7 +1298,9 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
           maxHeight: _maxImagePickerHeight,
         ),
         child: GestureDetector(
-          onTap: _showImageSourceSheet,
+          onTap: () => _closeKeyboardThen(() {
+            _showImageSourceSheet();
+          }),
           child: AspectRatio(
             aspectRatio: _imageAspectRatio,
             child: Container(
@@ -1171,7 +1346,10 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                           right: 10,
                           top: 10,
                           child: GestureDetector(
-                            onTap: _removeImage,
+                            onTap: () {
+                              FocusManager.instance.primaryFocus?.unfocus();
+                              _removeImage();
+                            },
                             child: Container(
                               width: 34,
                               height: 34,

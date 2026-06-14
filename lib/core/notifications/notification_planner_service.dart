@@ -14,8 +14,6 @@ class NotificationPlannerService {
 
     final todayItems = _getTodayPlannedItems(items);
 
-    debugPrint('TODAY_PLANNED_ITEMS=${todayItems.length}');
-
     if (todayItems.isEmpty) {
       return;
     }

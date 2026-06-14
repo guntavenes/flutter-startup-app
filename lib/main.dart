@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/app.dart';
 import 'package:flutter_startup_app/core/notifications/background_notification_dispatcher.dart';
 import 'package:flutter_startup_app/core/notifications/notification_service.dart';
+import 'package:flutter_startup_app/features/auth/data/auth_service.dart';
 import 'package:media_store_plus/media_store_plus.dart';
 import 'package:workmanager/workmanager.dart';
 
@@ -17,6 +18,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await AuthService.ensureSignedIn();
 
   if (Platform.isAndroid) {
     MediaStore.ensureInitialized();

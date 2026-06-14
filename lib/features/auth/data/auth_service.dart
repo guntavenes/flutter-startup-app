@@ -90,6 +90,21 @@ class AuthService {
     }
   }
 
+  static Future<User?> ensureSignedIn() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+
+    if (currentUser != null) {
+      await _createOrUpdateUserDocument(currentUser);
+      return currentUser;
+    }
+
+    final credential = await FirebaseAuth.instance.signInAnonymously();
+
+    await _createOrUpdateUserDocument(credential.user);
+
+    return credential.user;
+  }
+
   static Future<UserCredential?> continueWithGoogle() async {
     final currentUser = FirebaseAuth.instance.currentUser;
 

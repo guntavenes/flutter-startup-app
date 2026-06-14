@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
-import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:flutter_startup_app/features/templates/data/template_providers.dart';
 
@@ -29,7 +28,6 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
   }
 
   Future<void> _addSelectedItemsToList() async {
-
     if (_selectedItems.isEmpty) {
       debugPrint('Seçili item yok');
 

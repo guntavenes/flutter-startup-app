@@ -21,6 +21,7 @@ import 'package:flutter_startup_app/features/items/presentation/planned_items_sc
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
 import 'package:flutter_startup_app/features/categories/presentation/category_management_screen.dart';
+import 'package:flutter_startup_app/features/shared_lists/data/shared_list_providers.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -35,21 +36,35 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.initState();
 
     Future.microtask(() async {
-      final repository = ref.read(itemRepositoryProvider);
+      try {
+        final user = FirebaseAuth.instance.currentUser;
 
-      await repository.syncItemsFromFirestore();
+        if (user == null) {
+          return;
+        }
 
-      ref.invalidate(allItemsProvider);
+        await ref
+            .read(sharedListRepositoryProvider)
+            .ensureActiveListForUser(user);
 
-      ref.invalidate(groupedItemsProvider);
+        final itemRepository = ref.read(itemRepositoryProvider);
+
+        await itemRepository.syncItemsFromFirestore();
+
+        ref.invalidate(allItemsProvider);
+        ref.invalidate(groupedItemsProvider);
+      } catch (error, stackTrace) {
+        debugPrint('HOME_INIT_ERROR: $error');
+        debugPrintStack(stackTrace: stackTrace);
+      }
     });
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         await _checkTodayPlannedItemsNotification();
-      } catch (e, s) {
-        debugPrint('NOTIFICATION_ERROR: $e');
-        debugPrintStack(stackTrace: s);
+      } catch (error, stackTrace) {
+        debugPrint('NOTIFICATION_ERROR: $error');
+        debugPrintStack(stackTrace: stackTrace);
       }
     });
   }
