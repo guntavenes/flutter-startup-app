@@ -8,6 +8,7 @@ import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
 import 'package:flutter_startup_app/core/notifications/notification_planner_service.dart';
 import 'package:flutter_startup_app/features/auth/data/auth_providers.dart';
 import 'package:flutter_startup_app/features/auth/data/auth_service.dart';
+import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
 import 'package:flutter_startup_app/features/categories/presentation/category_detail_screen.dart';
 import 'package:flutter_startup_app/features/expenses/presentation/expense_detail_screen.dart';
 import 'package:flutter_startup_app/features/export/data/excel_export_service.dart';
@@ -19,6 +20,7 @@ import 'package:flutter_startup_app/features/items/presentation/item_list_screen
 import 'package:flutter_startup_app/features/items/presentation/planned_items_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
+import 'package:flutter_startup_app/features/categories/presentation/category_management_screen.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -199,99 +201,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ],
             ),
           ),
-          PopupMenuButton<String>(
+          IconButton(
             icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF6D4C5B)),
-            onSelected: (value) async {
-              if (value == 'excel') {
-                final path = await ExcelExportService.exportItems(
-                  items: allItems,
-                );
-
-                if (!mounted) {
-                  return;
-                }
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text(
-                      path == null
-                          ? 'Excel dosyası oluşturulamadı.'
-                          : 'Excel dosyası telefona kaydedildi.',
-                    ),
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
-              }
-
-              if (value == 'google_login') {
-                try {
-                  await AuthService.linkAnonymousUserWithGoogle();
-
-                  if (!mounted) {
-                    return;
-                  }
-
-                  ref.invalidate(authStateProvider);
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Google hesabı ile giriş yapıldı.'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                } catch (error) {
-                  if (!mounted) {
-                    return;
-                  }
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('Google giriş hatası: $error'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-              }
-
-              if (value == 'logout') {
-                await AuthService.signOut();
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'excel',
-                child: Row(
-                  children: [
-                    Icon(Icons.table_chart_outlined),
-                    SizedBox(width: 10),
-                    Text('Excel Olarak Dışa Aktar'),
-                  ],
-                ),
-              ),
-
-              if (isAnonymous)
-                const PopupMenuItem(
-                  value: 'google_login',
-                  child: Row(
-                    children: [
-                      Icon(Icons.login_rounded),
-                      SizedBox(width: 10),
-                      Text('Google Hesabına Geç'),
-                    ],
-                  ),
-                )
-              else
-                const PopupMenuItem(
-                  value: 'logout',
-                  child: Row(
-                    children: [
-                      Icon(Icons.logout_rounded),
-                      SizedBox(width: 10),
-                      Text('Çıkış Yap'),
-                    ],
-                  ),
-                ),
-            ],
+            onPressed: () => _showHomeMenu(allItems),
           ),
         ],
       ),
@@ -352,6 +264,252 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           _buildUpcomingCard(upcomingItems),
         ],
       ],
+    );
+  }
+
+  Future<void> _showHomeMenu(List<Item> allItems) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (bottomSheetContext) {
+        return Container(
+          margin: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(30),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 28,
+                offset: const Offset(0, 12),
+              ),
+            ],
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 42,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE8D3DD),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+                const SizedBox(height: 18),
+
+                Row(
+                  children: [
+                    Container(
+                      width: 52,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFFC1DE), Color(0xFFD96BA7)],
+                        ),
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                      child: const Icon(
+                        Icons.tune_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Menü',
+                            style: TextStyle(
+                              fontSize: 21,
+                              fontWeight: FontWeight.w900,
+                              color: Color(0xFF2C1E26),
+                            ),
+                          ),
+                          SizedBox(height: 3),
+                          Text(
+                            'Liste ayarları ve dışa aktarma',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF9A7A89),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 18),
+
+                _buildHomeMenuTile(
+                  icon: Icons.category_outlined,
+                  title: 'Kategorileri Yönet',
+                  subtitle: 'Kategori ekle, düzenle veya sil',
+                  onTap: () async {
+                    Navigator.of(bottomSheetContext).pop();
+
+                    await Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const CategoryManagementScreen(),
+                      ),
+                    );
+
+                    if (!mounted) return;
+
+                    ref.invalidate(categoriesProvider);
+                    ref.invalidate(groupedItemsProvider);
+                  },
+                ),
+
+                _buildHomeMenuTile(
+                  icon: Icons.ios_share_rounded,
+                  title: 'Paylaş',
+                  subtitle: 'Liste paylaşımı için hazırlanıyor',
+                  onTap: () {
+                    Navigator.of(bottomSheetContext).pop();
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Paylaş özelliği yakında eklenecek.'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                ),
+
+                _buildHomeMenuTile(
+                  icon: Icons.table_chart_rounded,
+                  title: 'Excel Olarak Dışa Aktar',
+                  subtitle: 'Listeyi Excel dosyası olarak oluştur',
+                  onTap: () async {
+                    Navigator.of(bottomSheetContext).pop();
+
+                    final path = await ExcelExportService.exportItems(
+                      items: allItems,
+                    );
+
+                    if (!mounted) return;
+
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          path == null
+                              ? 'Excel dosyası oluşturulamadı.'
+                              : 'Excel çıktısı hazırlandı.',
+                        ),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                ),
+
+                _buildHomeMenuTile(
+                  icon: Icons.login_rounded,
+                  title: 'Google Hesabına Geç',
+                  subtitle: 'Verilerini Google hesabınla eşitle',
+                  onTap: () async {
+                    Navigator.of(bottomSheetContext).pop();
+
+                    try {
+                      await AuthService.linkAnonymousUserWithGoogle();
+
+                      if (!mounted) return;
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Google hesabına geçildi.'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    } catch (error) {
+                      if (!mounted) return;
+
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Google giriş hatası: $error'),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildHomeMenuTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: const Color(0xFFFFF6FA),
+        borderRadius: BorderRadius.circular(22),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(22),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFD6EA),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(icon, color: const Color(0xFFD96BA7), size: 24),
+                ),
+                const SizedBox(width: 13),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF2C1E26),
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF9A7A89),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right_rounded,
+                  color: Color(0xFFB48A9D),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
