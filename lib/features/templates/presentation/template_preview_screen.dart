@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
@@ -21,6 +23,7 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
   Set<TemplateItem> _selectedItems = {};
   final Set<String> _collapsedCategoryNames = {};
   bool _initializedSelection = false;
+  bool _isAdding = false;
 
   @override
   void initState() {
@@ -28,73 +31,99 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
   }
 
   Future<void> _addSelectedItemsToList() async {
-    if (_selectedItems.isEmpty) {
-      debugPrint('Seçili item yok');
+    if (_isAdding) return;
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Listeye eklemek için en az bir ürün seçmelisin.'),
-            behavior: SnackBarBehavior.floating,
+    setState(() {
+      _isAdding = true;
+    });
+
+    try {
+      if (_selectedItems.isEmpty) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Listeye eklemek için en az bir ürün seçmelisin.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+
+      final categoryRepository = ref.read(categoryRepositoryProvider);
+      final itemRepository = ref.read(itemRepositoryProvider);
+
+      await categoryRepository.insertDefaultCategories();
+
+      final categories = await categoryRepository.getAll();
+      final existingItems = await itemRepository.getAllItems();
+      final now = DateTime.now().millisecondsSinceEpoch;
+
+      int addedCount = 0;
+      int skippedCount = 0;
+
+      for (final templateItem in _selectedItems) {
+        final category = categories.firstWhere(
+          (category) => category.name == templateItem.categoryName,
+          orElse: () {
+            throw Exception(
+              'Kategori bulunamadı: ${templateItem.categoryName}',
+            );
+          },
+        );
+
+        final alreadyExists = existingItems.any((item) {
+          return item.categoryId == category.id &&
+              item.name.trim().toLowerCase() ==
+                  templateItem.name.trim().toLowerCase();
+        });
+
+        if (alreadyExists) {
+          skippedCount++;
+          continue;
+        }
+
+        final itemsToInsert = <ItemsCompanion>[];
+
+        itemsToInsert.add(
+          ItemsCompanion.insert(
+            categoryId: category.id,
+            name: templateItem.name,
+            createdAt: now,
+            updateAt: now,
           ),
         );
+
+        if (itemsToInsert.isNotEmpty) {
+          await itemRepository.addItemsToLocalOnly(itemsToInsert);
+
+          unawaited(itemRepository.syncAllItemsToFirestore());
+        }
+
+        addedCount++;
       }
 
-      return;
-    }
+      if (!mounted) return;
 
-    final categoryRepository = ref.read(categoryRepositoryProvider);
-    final itemRepository = ref.read(itemRepositoryProvider);
+      Navigator.of(
+        context,
+      ).pop({'addedCount': addedCount, 'skippedCount': skippedCount});
+    } catch (error) {
+      if (!mounted) return;
 
-    await categoryRepository.insertDefaultCategories();
-
-    final categories = await categoryRepository.getAll();
-    final existingItems = await itemRepository.getAllItems();
-    final now = DateTime.now().millisecondsSinceEpoch;
-
-    int addedCount = 0;
-    int skippedCount = 0;
-
-    for (final templateItem in _selectedItems) {
-      final category = categories.firstWhere(
-        (category) => category.name == templateItem.categoryName,
-        orElse: () {
-          throw Exception('Kategori bulunamadı: ${templateItem.categoryName}');
-        },
-      );
-
-      final alreadyExists = existingItems.any((item) {
-        return item.categoryId == category.id &&
-            item.name.trim().toLowerCase() ==
-                templateItem.name.trim().toLowerCase();
-      });
-
-      if (alreadyExists) {
-        skippedCount++;
-        continue;
-      }
-
-      await itemRepository.addItem(
-        ItemsCompanion.insert(
-          categoryId: category.id,
-          name: templateItem.name,
-          createdAt: now,
-          updateAt: now,
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          behavior: SnackBarBehavior.floating,
         ),
       );
-
-      addedCount++;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAdding = false;
+        });
+      }
     }
-
-    debugPrint('Ekleme tamamlandı. added=$addedCount skipped=$skippedCount');
-
-    if (!mounted) {
-      return;
-    }
-
-    Navigator.of(
-      context,
-    ).pop({'addedCount': addedCount, 'skippedCount': skippedCount});
   }
 
   @override
@@ -331,14 +360,22 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
         width: double.infinity,
         height: 54,
         child: ElevatedButton.icon(
-          onPressed: () async {
-            debugPrint(
-              'Listeme Ekle tıklandı. Seçili: ${_selectedItems.length}',
-            );
-            await _addSelectedItemsToList();
-          },
-          icon: const Icon(Icons.add_task_rounded),
-          label: Text('Listeme Ekle (${_selectedItems.length})'),
+          onPressed: _isAdding ? null : _addSelectedItemsToList,
+          icon: _isAdding
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const Icon(Icons.add_task_rounded),
+          label: Text(
+            _isAdding
+                ? 'Listeye ekleniyor...'
+                : 'Listeme Ekle (${_selectedItems.length})',
+          ),
           style: ElevatedButton.styleFrom(
             backgroundColor: const Color(0xFFD96BA7),
             foregroundColor: Colors.white,

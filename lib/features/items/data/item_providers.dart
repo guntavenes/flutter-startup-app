@@ -71,3 +71,11 @@ final groupedItemsProvider = FutureProvider<Map<Category, List<Item>>>((
 
   return grouped;
 });
+
+final sharedItemsSyncProvider = StreamProvider<void>((ref) {
+  final repository = ref.watch(itemRepositoryProvider);
+
+  return repository.watchSharedListItems().map((_) {
+    ref.invalidate(allItemsProvider);
+  });
+});

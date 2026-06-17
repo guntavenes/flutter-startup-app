@@ -1,37 +1,36 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
-	<dict>
-		<key>CLIENT_ID</key>
-		<string>268039661382-r86u0uako67f4mqe39nlt9k1k4bpftd7.apps.googleusercontent.com</string>
-		<key>REVERSED_CLIENT_ID</key>
-		<string>com.googleusercontent.apps.268039661382-r86u0uako67f4mqe39nlt9k1k4bpftd7</string>
-		<key>ANDROID_CLIENT_ID</key>
-		<string>268039661382-6ep2srb19a70j6ouga0luu77v06m7pus.apps.googleusercontent.com</string>
-		<key>API_KEY</key>
-		<string>AIzaSyAZx2KngTFQ-A4iSW4bD_lbuWgdu8LpyrI</string>
-		<key>GCM_SENDER_ID</key>
-		<string>268039661382</string>
-		<key>PLIST_VERSION</key>
-		<string>1</string>
-		<key>BUNDLE_ID</key>
-		<string>com.example.flutterStartupApp</string>
-		<key>PROJECT_ID</key>
-		<string>my-ceyiz-takip</string>
-		<key>STORAGE_BUCKET</key>
-		<string>my-ceyiz-takip.firebasestorage.app</string>
-		<key>IS_ADS_ENABLED</key>
-		<false />
-		<key>IS_ANALYTICS_ENABLED</key>
-		<false />
-		<key>IS_APPINVITE_ENABLED</key>
-		<true />
-		<key>IS_GCM_ENABLED</key>
-		<true />
-		<key>IS_SIGNIN_ENABLED</key>
-		<true />
-		<key>GOOGLE_APP_ID</key>
-		<string>1:268039661382:ios:16d5a72ee6f8805df3a747</string>
-
-	</dict>
+<dict>
+	<key>CLIENT_ID</key>
+	<string>268039661382-r86u0uako67f4mqe39nlt9k1k4bpftd7.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.268039661382-r86u0uako67f4mqe39nlt9k1k4bpftd7</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>268039661382-6ep2srb19a70j6ouga0luu77v06m7pus.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyAZx2KngTFQ-A4iSW4bD_lbuWgdu8LpyrI</string>
+	<key>GCM_SENDER_ID</key>
+	<string>268039661382</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.flutterStartupApp</string>
+	<key>PROJECT_ID</key>
+	<string>my-ceyiz-takip</string>
+	<key>STORAGE_BUCKET</key>
+	<string>my-ceyiz-takip.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:268039661382:ios:16d5a72ee6f8805df3a747</string>
+</dict>
 </plist>

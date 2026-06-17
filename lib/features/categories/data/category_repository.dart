@@ -1,16 +1,23 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_startup_app/features/shared_lists/data/shared_list_repository.dart';
 
 import '../../../core/database/app_database.dart';
 
 class CategoryRepository {
-  CategoryRepository(this._db);
+  CategoryRepository(this._db, this._sharedListRepository);
 
   final AppDatabase _db;
+  final SharedListRepository _sharedListRepository;
 
   Future<List<Category>> getAll() {
     return _db.select(_db.categories).get();
+  }
+
+  Future<CollectionReference<Map<String, dynamic>>>
+  _categoriesCollection() async {
+    final listRef = await _sharedListRepository.getActiveListRef();
+    return listRef.collection('categories');
   }
 
   Future<void> insertDefaultCategories() async {
@@ -59,17 +66,7 @@ class CategoryRepository {
   }
 
   Future<void> syncCategoriesFromFirestore() async {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      return;
-    }
-
-    final snapshot = await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('categories')
-        .get();
+    final snapshot = await (await _categoriesCollection()).get();
 
     if (snapshot.docs.isEmpty) {
       return;
@@ -161,6 +158,46 @@ class CategoryRepository {
     );
   }
 
+  Stream<void> watchSharedListCategories() async* {
+    final collection = await _categoriesCollection();
+
+    yield* collection.snapshots().asyncMap((snapshot) async {
+      if (snapshot.docs.isEmpty) {
+        return;
+      }
+
+      final remoteIds = <int>{};
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final id = data['id'] as int;
+
+        remoteIds.add(id);
+
+        await _db
+            .into(_db.categories)
+            .insertOnConflictUpdate(
+              CategoriesCompanion(
+                id: Value(id),
+                name: Value(data['name'] as String),
+                iconName: Value(data['iconName'] as String? ?? 'category'),
+                createdAt: Value(data['createdAt'] as int),
+              ),
+            );
+      }
+
+      final localCategories = await getAll();
+
+      for (final category in localCategories) {
+        if (!remoteIds.contains(category.id)) {
+          await (_db.delete(
+            _db.categories,
+          )..where((tbl) => tbl.id.equals(category.id))).go();
+        }
+      }
+    });
+  }
+
   Future<void> deleteCategory(Category category) async {
     final itemCount = await (_db.select(
       _db.items,
@@ -174,18 +211,8 @@ class CategoryRepository {
       _db.categories,
     )..where((tbl) => tbl.id.equals(category.id))).go();
 
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      return;
-    }
-
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('categories')
-        .doc(category.id.toString())
-        .delete();
+    final collection = await _categoriesCollection();
+    await collection.doc(category.id.toString()).delete();
   }
 
   Future<void> updateDefaultCategoryIcons() async {
@@ -217,38 +244,24 @@ class CategoryRepository {
   }
 
   Future<void> _syncCategoriesToFirestore(List<Category> categories) async {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      return;
-    }
-
     final batch = FirebaseFirestore.instance.batch();
+    final collection = await _categoriesCollection();
 
     for (final category in categories) {
-      final categoryRef = FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .collection('categories')
-          .doc(category.id.toString());
-
-      batch.set(categoryRef, _categoryToMap(category), SetOptions(merge: true));
+      batch.set(
+        collection.doc(category.id.toString()),
+        _categoryToMap(category),
+        SetOptions(merge: true),
+      );
     }
 
     await batch.commit();
   }
 
   Future<void> _syncSingleCategoryToFirestore(Category category) async {
-    final user = FirebaseAuth.instance.currentUser;
+    final collection = await _categoriesCollection();
 
-    if (user == null) {
-      return;
-    }
-
-    await FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('categories')
+    await collection
         .doc(category.id.toString())
         .set(_categoryToMap(category), SetOptions(merge: true));
   }

@@ -13,12 +13,14 @@ import 'package:flutter_startup_app/features/categories/presentation/category_de
 import 'package:flutter_startup_app/features/expenses/presentation/expense_detail_screen.dart';
 import 'package:flutter_startup_app/features/export/data/excel_export_service.dart';
 import 'package:flutter_startup_app/features/items/data/item_providers.dart';
-import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
+import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart'
+    hide sharedItemsSyncProvider;
 import 'package:flutter_startup_app/features/items/domain/planned_item_filter.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/item_list_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/planned_items_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
+import 'package:flutter_startup_app/features/shared_lists/presentation/share_list_bottom_sheet.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
 import 'package:flutter_startup_app/features/categories/presentation/category_management_screen.dart';
 import 'package:flutter_startup_app/features/shared_lists/data/shared_list_providers.dart';
@@ -387,16 +389,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 _buildHomeMenuTile(
                   icon: Icons.ios_share_rounded,
                   title: 'Paylaş',
-                  subtitle: 'Liste paylaşımı için hazırlanıyor',
-                  onTap: () {
+                  subtitle: 'Davet kodu ile ortak liste oluştur',
+                  onTap: () async {
                     Navigator.of(bottomSheetContext).pop();
 
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Paylaş özelliği yakında eklenecek.'),
-                        behavior: SnackBarBehavior.floating,
-                      ),
+                    final result = await showModalBottomSheet<bool>(
+                      context: context,
+                      backgroundColor: Colors.transparent,
+                      isScrollControlled: true,
+                      builder: (_) => const ShareListBottomSheet(),
                     );
+
+                    if (result == true && mounted) {
+                      ref.invalidate(allItemsProvider);
+                      ref.invalidate(groupedItemsProvider);
+                      ref.invalidate(categoriesProvider);
+                    }
                   },
                 ),
 
@@ -1277,35 +1285,38 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildTemplateCard() {
     return GestureDetector(
       onTap: () async {
-        final result = await Navigator.of(context).push(
+        final result = await Navigator.of(context).push<Map<String, int>>(
           MaterialPageRoute(
             builder: (_) =>
                 const TemplatePreviewScreen(title: 'Hazır Çeyiz Şablonu'),
           ),
         );
 
-        if (result != null && context.mounted) {
-          Future.microtask(() {
-            ref.invalidate(allItemsProvider);
-            ref.invalidate(groupedItemsProvider);
-          });
+        if (result == null) {
+          return;
         }
 
         final addedCount = result['addedCount'] ?? 0;
         final skippedCount = result['skippedCount'] ?? 0;
 
-        final message = addedCount > 0
-            ? '$addedCount ürün listene eklendi. $skippedCount ürün zaten vardı.'
-            : 'Seçili ürünler zaten listende vardı.';
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(message),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+          ref.invalidate(allItemsProvider);
+        });
+
+        if (!mounted) {
+          return;
         }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              '$addedCount ürün eklendi. $skippedCount ürün zaten vardı.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       },
       child: Container(
         width: double.infinity,

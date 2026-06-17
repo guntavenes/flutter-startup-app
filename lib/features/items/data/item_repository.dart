@@ -1,16 +1,24 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_startup_app/features/shared_lists/data/shared_list_repository.dart';
 
 import '../../../core/database/app_database.dart';
 
 class ItemRepository {
-  ItemRepository(this._database);
+  ItemRepository(this._database, this._sharedListRepository);
 
   final AppDatabase _database;
+  final SharedListRepository _sharedListRepository;
 
   Future<List<Item>> getAllItems() {
     return _database.select(_database.items).get();
+  }
+
+  Future<CollectionReference<Map<String, dynamic>>> _itemsCollection() async {
+    final listRef = await _sharedListRepository.getActiveListRef();
+    return listRef.collection('items');
   }
 
   Future<int> addItem(ItemsCompanion item) async {
@@ -23,6 +31,59 @@ class ItemRepository {
     await _setItemToFirestore(insertedItem);
 
     return insertedId;
+  }
+
+  Stream<void> watchSharedListItems() async* {
+    final collection = await _itemsCollection();
+
+    yield* collection.snapshots().asyncMap((snapshot) async {
+      final remoteIds = <int>{};
+
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final id = data['id'] as int;
+
+        remoteIds.add(id);
+
+        await _database
+            .into(_database.items)
+            .insertOnConflictUpdate(
+              ItemsCompanion(
+                id: Value(id),
+                categoryId: Value(data['categoryId'] as int),
+                name: Value(data['name'] as String),
+                brand: Value(data['brand'] as String?),
+                model: Value(data['model'] as String?),
+                link: Value(data['link'] as String?),
+                plannedPrice: Value((data['plannedPrice'] as num?)?.toDouble()),
+                purchasedPrice: Value(
+                  (data['purchasedPrice'] as num?)?.toDouble(),
+                ),
+                purchaseDate: Value(data['purchaseDate'] as int?),
+                storeName: Value(data['storeName'] as String?),
+                note: Value(data['note'] as String?),
+                extraFeatures: Value(data['extraFeatures'] as String?),
+                imagePath: Value(data['imagePath'] as String?),
+                isPurchased: Value(data['isPurchased'] as bool? ?? false),
+                createdAt: Value(data['createdAt'] as int),
+                updateAt: Value(data['updateAt'] as int),
+                estimatedPurchaseDate: Value(
+                  data['estimatedPurchaseDate'] as int?,
+                ),
+              ),
+            );
+      }
+
+      final localItems = await getAllItems();
+
+      for (final item in localItems) {
+        if (!remoteIds.contains(item.id)) {
+          await (_database.delete(
+            _database.items,
+          )..where((tbl) => tbl.id.equals(item.id))).go();
+        }
+      }
+    });
   }
 
   Future<int> updateItemDetails({
@@ -132,11 +193,7 @@ class ItemRepository {
     final items = await getAllItems();
 
     final batch = FirebaseFirestore.instance.batch();
-    final collection = _itemsCollection();
-
-    if (collection == null) {
-      return;
-    }
+    final collection = await _itemsCollection();
 
     for (final item in items) {
       batch.set(
@@ -149,25 +206,8 @@ class ItemRepository {
     await batch.commit();
   }
 
-  CollectionReference<Map<String, dynamic>>? _itemsCollection() {
-    final user = FirebaseAuth.instance.currentUser;
-
-    if (user == null) {
-      return null;
-    }
-
-    return FirebaseFirestore.instance
-        .collection('users')
-        .doc(user.uid)
-        .collection('items');
-  }
-
   Future<void> _setItemToFirestore(Item item) async {
-    final collection = _itemsCollection();
-
-    if (collection == null) {
-      return;
-    }
+    final collection = await _itemsCollection();
 
     await collection
         .doc(item.id.toString())
@@ -175,11 +215,7 @@ class ItemRepository {
   }
 
   Future<void> _deleteItemFromFirestore(int id) async {
-    final collection = _itemsCollection();
-
-    if (collection == null) {
-      return;
-    }
+    final collection = await _itemsCollection();
 
     await collection.doc(id.toString()).delete();
   }
@@ -207,18 +243,30 @@ class ItemRepository {
     };
   }
 
-  Future<void> syncItemsFromFirestore() async {
-    final collection = _itemsCollection();
-    if (collection == null) return;
+  Future<void> addItemsFromTemplate(List<ItemsCompanion> items) async {
+    await _database.batch((batch) {
+      batch.insertAll(_database.items, items);
+    });
 
+    await syncAllItemsToFirestore();
+  }
+
+  Future<void> addItemsToLocalOnly(List<ItemsCompanion> items) async {
+    await _database.batch((batch) {
+      batch.insertAll(_database.items, items);
+    });
+  }
+
+  Future<void> syncItemsFromFirestore() async {
+    final collection = await _itemsCollection();
     final snapshot = await collection.get();
 
     final remoteIds = <int>{};
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
-
       final id = data['id'] as int;
+
       remoteIds.add(id);
 
       await _database

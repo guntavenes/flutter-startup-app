@@ -10,3 +10,8 @@ final activeListIdProvider = FutureProvider<String>((ref) async {
   final repository = ref.watch(sharedListRepositoryProvider);
   return repository.ensureActiveList();
 });
+
+final inviteCodeProvider = FutureProvider<String?>((ref) async {
+  final repository = ref.watch(sharedListRepositoryProvider);
+  return repository.getInviteCode();
+});

@@ -89,15 +89,47 @@ class SharedListRepository {
   }
 
   Future<String> ensureActiveListForUser(User user) async {
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final userRef = _firestore.collection('users').doc(user.uid);
 
-    final existingListId = userDoc.data()?['activeListId'] as String?;
+    return _firestore.runTransaction<String>((transaction) async {
+      final userSnapshot = await transaction.get(userRef);
 
-    if (existingListId != null && existingListId.isNotEmpty) {
-      return existingListId;
-    }
+      final existingListId = userSnapshot.data()?['activeListId'] as String?;
 
-    return createListForUser(user);
+      if (existingListId != null && existingListId.isNotEmpty) {
+        return existingListId;
+      }
+
+      final listRef = _firestore.collection('sharedLists').doc();
+      final inviteCode = _generateInviteCode();
+
+      transaction.set(listRef, {
+        'name': '${user.displayName ?? 'Kullanıcı'} Çeyiz Listesi',
+        'ownerId': user.uid,
+        'inviteCode': inviteCode,
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(listRef.collection('members').doc(user.uid), {
+        'uid': user.uid,
+        'email': user.email,
+        'displayName': user.displayName,
+        'role': 'owner',
+        'joinedAt': FieldValue.serverTimestamp(),
+      });
+
+      transaction.set(userRef, {
+        'uid': user.uid,
+        'email': user.email,
+        'displayName': user.displayName,
+        'isAnonymous': user.isAnonymous,
+        'activeListId': listRef.id,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      return listRef.id;
+    });
   }
 
   Future<String> createListForUser(User user) async {
@@ -135,6 +167,18 @@ class SharedListRepository {
     return List.generate(6, (_) => chars[random.nextInt(chars.length)]).join();
   }
 
+  Future<String?> getInviteCode() async {
+    final listId = await getActiveListId();
+
+    if (listId == null || listId.isEmpty) {
+      return null;
+    }
+
+    final doc = await _firestore.collection('sharedLists').doc(listId).get();
+
+    return doc.data()?['inviteCode'] as String?;
+  }
+
   Future<User> _requireCurrentUser() async {
     final existingUser = FirebaseAuth.instance.currentUser;
 
@@ -147,5 +191,11 @@ class SharedListRepository {
     );
 
     return user!;
+  }
+
+  Future<DocumentReference<Map<String, dynamic>>> getActiveListRef() async {
+    final listId = await ensureActiveList();
+
+    return _firestore.collection('sharedLists').doc(listId);
   }
 }
