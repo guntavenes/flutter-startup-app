@@ -173,6 +173,7 @@ class ItemRepository {
             imagePath: const Value(null),
             link: const Value(null),
             updateAt: Value(DateTime.now().millisecondsSinceEpoch),
+            brand: const Value(null),
           ),
         );
 

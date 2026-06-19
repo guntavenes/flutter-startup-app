@@ -56,8 +56,9 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
     _nameController.text = item.name;
     _brandController.text = item.brand ?? '';
     _modelController.text = item.model ?? '';
-    _priceController.text = item.purchasedPrice?.toString() ?? '';
-    _linkController.text = item.link ?? '';
+    _priceController.text = item.purchasedPrice == null
+        ? ''
+        : item.purchasedPrice!.toInt().toString();
     _noteController.text = item.note ?? '';
 
     _isPurchased = item.isPurchased;
@@ -1371,6 +1372,19 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  String _formatPriceForController(double? price) {
+    if (price == null) {
+      return '';
+    }
+
+    final value = price.truncate();
+
+    return value.toString().replaceAllMapped(
+      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
+      (match) => '${match[1]}.',
     );
   }
 }
