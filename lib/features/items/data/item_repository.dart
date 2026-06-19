@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_startup_app/features/shared_lists/data/shared_list_repository.dart';
 
 import '../../../core/database/app_database.dart';
@@ -11,6 +12,7 @@ class ItemRepository {
 
   final AppDatabase _database;
   final SharedListRepository _sharedListRepository;
+  bool _isSyncingToFirestore = false;
 
   Future<List<Item>> getAllItems() {
     return _database.select(_database.items).get();
@@ -18,6 +20,9 @@ class ItemRepository {
 
   Future<CollectionReference<Map<String, dynamic>>> _itemsCollection() async {
     final listRef = await _sharedListRepository.getActiveListRef();
+
+    debugPrint('ITEM_WRITE_PATH=${listRef.collection('items').path}');
+
     return listRef.collection('items');
   }
 
@@ -33,17 +38,145 @@ class ItemRepository {
     return insertedId;
   }
 
+  Future<void> mergeLocalItemsToActiveSharedList() async {
+    final localItems = await getAllItems();
+    if (localItems.isEmpty) return;
+
+    final collection = await _itemsCollection();
+    final snapshot = await collection.get();
+
+    final remoteItems = snapshot.docs.map((doc) => doc.data()).toList();
+
+    for (final localItem in localItems) {
+      final matchingRemote = remoteItems.where((remote) {
+        return remote['categoryId'] == localItem.categoryId &&
+            (remote['name'] as String).trim().toLowerCase() ==
+                localItem.name.trim().toLowerCase();
+      }).firstOrNull;
+
+      if (matchingRemote == null) {
+        final newDoc = collection.doc();
+        final newId = DateTime.now().microsecondsSinceEpoch;
+
+        final map = _itemToMap(localItem);
+        map['id'] = newId;
+        map['syncedAt'] = FieldValue.serverTimestamp();
+
+        await newDoc.set(map);
+
+        remoteItems.add(map);
+
+        continue;
+      }
+
+      final remoteIsPurchased = matchingRemote['isPurchased'] as bool? ?? false;
+
+      // İkisi de alınmışsa ayrı ürün oluştur
+      if (localItem.isPurchased && remoteIsPurchased) {
+        final itemName = _generateUniqueItemName(
+          baseName: localItem.name,
+          categoryId: localItem.categoryId,
+          remoteItems: remoteItems,
+        );
+
+        final newDoc = collection.doc();
+        final newId = DateTime.now().microsecondsSinceEpoch;
+
+        final map = _itemToMap(localItem);
+        map['id'] = newId;
+        map['name'] = itemName;
+        map['syncedAt'] = FieldValue.serverTimestamp();
+
+        await newDoc.set(map);
+
+        remoteItems.add(map);
+
+        continue;
+      }
+
+      final remoteId = matchingRemote['id'] as int;
+      final remoteUpdateAt = matchingRemote['updateAt'] as int? ?? 0;
+
+      final mergedIsPurchased = localItem.isPurchased || remoteIsPurchased;
+
+      final mergedUpdateAt = localItem.updateAt > remoteUpdateAt
+          ? localItem.updateAt
+          : remoteUpdateAt;
+
+      final mergedMap = {
+        ...matchingRemote,
+        'isPurchased': mergedIsPurchased,
+        'brand': localItem.brand ?? matchingRemote['brand'],
+        'model': localItem.model ?? matchingRemote['model'],
+        'link': localItem.link ?? matchingRemote['link'],
+        'plannedPrice':
+            localItem.plannedPrice ?? matchingRemote['plannedPrice'],
+        'purchasedPrice':
+            localItem.purchasedPrice ?? matchingRemote['purchasedPrice'],
+        'purchaseDate':
+            localItem.purchaseDate ?? matchingRemote['purchaseDate'],
+        'storeName': localItem.storeName ?? matchingRemote['storeName'],
+        'note': localItem.note ?? matchingRemote['note'],
+        'extraFeatures':
+            localItem.extraFeatures ?? matchingRemote['extraFeatures'],
+        'imagePath': localItem.imagePath ?? matchingRemote['imagePath'],
+        'updateAt': mergedUpdateAt,
+        'syncedAt': FieldValue.serverTimestamp(),
+      };
+
+      await collection
+          .doc(remoteId.toString())
+          .set(mergedMap, SetOptions(merge: true));
+    }
+  }
+
+  String _generateUniqueItemName({
+    required String baseName,
+    required int categoryId,
+    required List<Map<String, dynamic>> remoteItems,
+  }) {
+    final normalizedBaseName = baseName.trim().toLowerCase();
+
+    final existingNames = remoteItems
+        .where((item) => item['categoryId'] == categoryId)
+        .map((item) => (item['name'] as String).trim().toLowerCase())
+        .toSet();
+
+    if (!existingNames.contains(normalizedBaseName)) {
+      return baseName;
+    }
+
+    var counter = 2;
+
+    while (existingNames.contains('$normalizedBaseName $counter')) {
+      counter++;
+    }
+
+    return '$baseName $counter';
+  }
+
   Stream<void> watchSharedListItems() async* {
     final collection = await _itemsCollection();
 
+    debugPrint('ITEM_LISTENER_PATH=${collection.path}');
+
     yield* collection.snapshots().asyncMap((snapshot) async {
-      final remoteIds = <int>{};
+      debugPrint('ITEM_LISTENER_DOC_COUNT=${snapshot.docs.length}');
 
       for (final doc in snapshot.docs) {
         final data = doc.data();
+
+        final isDeleted = data['isDeleted'] as bool? ?? false;
+
         final id = data['id'] as int;
 
-        remoteIds.add(id);
+        if (isDeleted) {
+          await (_database.delete(
+            _database.items,
+          )..where((tbl) => tbl.id.equals(id))).go();
+
+          continue;
+        }
 
         await _database
             .into(_database.items)
@@ -73,17 +206,11 @@ class ItemRepository {
               ),
             );
       }
-
-      final localItems = await getAllItems();
-
-      for (final item in localItems) {
-        if (!remoteIds.contains(item.id)) {
-          await (_database.delete(
-            _database.items,
-          )..where((tbl) => tbl.id.equals(item.id))).go();
-        }
-      }
     });
+  }
+
+  Stream<List<Item>> watchAllItems() {
+    return _database.select(_database.items).watch();
   }
 
   Future<int> updateItemDetails({
@@ -104,11 +231,21 @@ class ItemRepository {
   }
 
   Future<int> deleteItemById(int id) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+
     final result = await (_database.delete(
       _database.items,
     )..where((tbl) => tbl.id.equals(id))).go();
 
-    await _deleteItemFromFirestore(id);
+    final collection = await _itemsCollection();
+
+    await collection.doc(id.toString()).set({
+      'id': id,
+      'isDeleted': true,
+      'deletedAt': now,
+      'updateAt': now,
+      'syncedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
     return result;
   }
@@ -307,6 +444,26 @@ class ItemRepository {
           _database.items,
         )..where((tbl) => tbl.id.equals(item.id))).go();
       }
+    }
+  }
+
+  Future<void> addTemplateItemsAndSync(List<ItemsCompanion> companions) async {
+    if (companions.isEmpty) return;
+
+    final collection = await _itemsCollection();
+
+    for (final companion in companions) {
+      final id = await _database.into(_database.items).insert(companion);
+
+      final item = await (_database.select(
+        _database.items,
+      )..where((tbl) => tbl.id.equals(id))).getSingle();
+
+      await collection
+          .doc(item.id.toString())
+          .set(_itemToMap(item), SetOptions(merge: true));
+
+      await Future<void>.delayed(const Duration(milliseconds: 20));
     }
   }
 }

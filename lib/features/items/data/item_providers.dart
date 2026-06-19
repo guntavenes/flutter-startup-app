@@ -11,71 +11,90 @@ final itemFilterProvider = StateProvider<ItemFilter>((ref) {
   return ItemFilter.all;
 });
 
-final allItemsProvider = FutureProvider<List<Item>>((ref) async {
+final allItemsProvider = StreamProvider<List<Item>>((ref) {
   final repository = ref.watch(itemRepositoryProvider);
-  return repository.getAllItems();
+
+  return repository.watchAllItems();
 });
 
-final itemsProvider = FutureProvider<List<Item>>((ref) async {
+final itemsProvider = Provider<AsyncValue<List<Item>>>((ref) {
   final filter = ref.watch(itemFilterProvider);
-  final items = await ref.watch(allItemsProvider.future);
+  final itemsAsync = ref.watch(allItemsProvider);
 
-  switch (filter) {
-    case ItemFilter.remaining:
-      return items.where((e) => !e.isPurchased).toList();
-    case ItemFilter.purchased:
-      return items.where((e) => e.isPurchased).toList();
-    case ItemFilter.all:
-      return items;
-  }
+  return itemsAsync.when(
+    loading: () => const AsyncLoading(),
+    error: (error, stackTrace) => AsyncError(error, stackTrace),
+    data: (items) {
+      switch (filter) {
+        case ItemFilter.remaining:
+          return AsyncData(items.where((e) => !e.isPurchased).toList());
+        case ItemFilter.purchased:
+          return AsyncData(items.where((e) => e.isPurchased).toList());
+        case ItemFilter.all:
+          return AsyncData(items);
+      }
+    },
+  );
 });
 
-final recentPurchasedItemsProvider = FutureProvider<List<Item>>((ref) async {
-  final items = await ref.watch(allItemsProvider.future);
+final recentPurchasedItemsProvider = Provider<AsyncValue<List<Item>>>((ref) {
+  final itemsAsync = ref.watch(allItemsProvider);
 
-  final sevenDaysAgo = DateTime.now()
-      .subtract(const Duration(days: 7))
-      .millisecondsSinceEpoch;
+  return itemsAsync.when(
+    loading: () => const AsyncLoading(),
+    error: (error, stackTrace) => AsyncError(error, stackTrace),
+    data: (items) {
+      final sevenDaysAgo = DateTime.now()
+          .subtract(const Duration(days: 7))
+          .millisecondsSinceEpoch;
 
-  final recentItems = items.where((item) {
-    return item.isPurchased && item.updateAt >= sevenDaysAgo;
-  }).toList();
+      final recentItems = items.where((item) {
+        return item.isPurchased && item.updateAt >= sevenDaysAgo;
+      }).toList();
 
-  recentItems.sort((a, b) {
-    return b.updateAt.compareTo(a.updateAt);
-  });
+      recentItems.sort((a, b) {
+        return b.updateAt.compareTo(a.updateAt);
+      });
 
-  return recentItems;
+      return AsyncData(recentItems);
+    },
+  );
 });
 
-final groupedItemsProvider = FutureProvider<Map<Category, List<Item>>>((
+final groupedItemsProvider = Provider<AsyncValue<Map<Category, List<Item>>>>((
   ref,
-) async {
-  final items = await ref.watch(allItemsProvider.future);
-  final categories = await ref.watch(categoriesProvider.future);
+) {
+  final itemsAsync = ref.watch(allItemsProvider);
+  final categoriesAsync = ref.watch(categoriesProvider);
 
-  final Map<Category, List<Item>> grouped = {};
+  return itemsAsync.when(
+    loading: () => const AsyncValue.loading(),
+    error: (error, stackTrace) => AsyncValue.error(error, stackTrace),
+    data: (items) {
+      return categoriesAsync.when(
+        loading: () => const AsyncValue.loading(),
+        error: (error, stackTrace) => AsyncValue.error(error, stackTrace),
+        data: (categories) {
+          final groupedItems = <Category, List<Item>>{};
 
-  for (final category in categories) {
-    grouped[category] = [];
-  }
+          for (final category in categories) {
+            final categoryItems = items
+                .where((item) => item.categoryId == category.id)
+                .toList();
 
-  for (final item in items) {
-    final category = categories.firstWhere(
-      (category) => category.id == item.categoryId,
-      orElse: () => categories.first,
-    );
+            if (categoryItems.isNotEmpty) {
+              groupedItems[category] = categoryItems;
+            }
+          }
 
-    grouped[category]!.add(item);
-  }
-
-  return grouped;
+          return AsyncValue.data(groupedItems);
+        },
+      );
+    },
+  );
 });
 
 final sharedItemsSyncProvider = StreamProvider<void>((ref) {
   final repository = ref.watch(itemRepositoryProvider);
-
-  return repository.watchSharedListItems().map((_) {
-    ref.invalidate(allItemsProvider);
-  });
+  return repository.watchSharedListItems();
 });

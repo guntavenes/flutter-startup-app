@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 
+import '../../categories/data/category_providers.dart';
+import '../../items/data/item_providers.dart' hide sharedItemsSyncProvider;
 import '../data/shared_list_providers.dart';
 
 class ShareListBottomSheet extends ConsumerStatefulWidget {
@@ -37,10 +40,9 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
 
   Future<void> _joinList() async {
     FocusManager.instance.primaryFocus?.unfocus();
-
     await Future.delayed(const Duration(milliseconds: 120));
 
-    final code = _inviteCodeController.text.trim();
+    final code = _inviteCodeController.text.trim().toUpperCase();
 
     if (code.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -59,14 +61,30 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
     try {
       await ref.read(sharedListRepositoryProvider).joinListWithInviteCode(code);
 
-      ref.invalidate(inviteCodeProvider);
       ref.invalidate(activeListIdProvider);
+      ref.invalidate(inviteCodeProvider);
+      ref.invalidate(itemRepositoryProvider);
+
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      final categoryRepository = ref.read(categoryRepositoryProvider);
+      final itemRepository = ref.read(itemRepositoryProvider);
+
+      await categoryRepository.syncCategoriesFromFirestore();
+
+      await itemRepository.mergeLocalItemsToActiveSharedList();
+      await itemRepository.syncItemsFromFirestore();
+
+      ref.invalidate(categoriesProvider);
 
       if (!mounted) return;
 
-      Navigator.of(context).pop(true);
+      final messenger = ScaffoldMessenger.of(context);
+      final navigator = Navigator.of(context);
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      navigator.pop(true);
+
+      messenger.showSnackBar(
         const SnackBar(
           content: Text('Listeye katıldın.'),
           behavior: SnackBarBehavior.floating,
@@ -153,7 +171,6 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
                 ),
               ),
               const SizedBox(height: 20),
-
               inviteCodeAsync.when(
                 loading: () => const CircularProgressIndicator(),
                 error: (error, _) => Text(
@@ -214,11 +231,9 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
                   );
                 },
               ),
-
               const SizedBox(height: 18),
               const Divider(),
               const SizedBox(height: 12),
-
               TextField(
                 controller: _inviteCodeController,
                 textCapitalization: TextCapitalization.characters,

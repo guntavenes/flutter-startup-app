@@ -15,13 +15,13 @@ class SharedListRepository {
   }
 
   Future<String> ensureActiveList() async {
-    final existingListId = await getActiveListId();
+    final user = FirebaseAuth.instance.currentUser;
 
-    if (existingListId != null && existingListId.isNotEmpty) {
-      return existingListId;
+    if (user == null) {
+      throw Exception('Kullanıcı bulunamadı.');
     }
 
-    return createList();
+    return ensureActiveListForUser(user);
   }
 
   Future<String> createList() async {

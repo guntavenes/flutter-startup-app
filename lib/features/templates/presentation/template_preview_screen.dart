@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/core/database/app_database.dart';
 import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
+import 'package:flutter_startup_app/features/items/data/item_providers.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 import 'package:flutter_startup_app/features/templates/data/template_providers.dart';
 
@@ -39,14 +40,14 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
 
     try {
       if (_selectedItems.isEmpty) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Listeye eklemek için en az bir ürün seçmelisin.'),
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Listeye eklemek için en az bir ürün seçmelisin.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
         return;
       }
 
@@ -58,6 +59,8 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
       final categories = await categoryRepository.getAll();
       final existingItems = await itemRepository.getAllItems();
       final now = DateTime.now().millisecondsSinceEpoch;
+
+      final itemsToInsert = <ItemsCompanion>[];
 
       int addedCount = 0;
       int skippedCount = 0;
@@ -83,8 +86,6 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
           continue;
         }
 
-        final itemsToInsert = <ItemsCompanion>[];
-
         itemsToInsert.add(
           ItemsCompanion.insert(
             categoryId: category.id,
@@ -94,14 +95,16 @@ class _TemplatePreviewScreenState extends ConsumerState<TemplatePreviewScreen> {
           ),
         );
 
-        if (itemsToInsert.isNotEmpty) {
-          await itemRepository.addItemsToLocalOnly(itemsToInsert);
-
-          unawaited(itemRepository.syncAllItemsToFirestore());
-        }
-
         addedCount++;
       }
+
+      if (itemsToInsert.isNotEmpty) {
+        await itemRepository.addItemsToLocalOnly(itemsToInsert);
+        unawaited(itemRepository.syncAllItemsToFirestore());
+      }
+
+      ref.invalidate(allItemsProvider);
+      ref.invalidate(groupedItemsProvider);
 
       if (!mounted) return;
 

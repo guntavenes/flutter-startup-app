@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -33,9 +35,13 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
+  StreamSubscription<void>? _sharedItemsSubscription;
+
   @override
   void initState() {
     super.initState();
+
+    Future.microtask(_startSharedItemsListener);
 
     Future.microtask(() async {
       try {
@@ -44,10 +50,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         if (user == null) {
           return;
         }
-
-        await ref
-            .read(sharedListRepositoryProvider)
-            .ensureActiveListForUser(user);
 
         final itemRepository = ref.read(itemRepositoryProvider);
 
@@ -69,6 +71,32 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         debugPrintStack(stackTrace: stackTrace);
       }
     });
+  }
+
+  Future<void> _startSharedItemsListener() async {
+    try {
+      await _sharedItemsSubscription?.cancel();
+      _sharedItemsSubscription = null;
+
+      await ref.read(activeListIdProvider.future);
+
+      final repository = ref.read(itemRepositoryProvider);
+
+      await repository.syncItemsFromFirestore();
+
+      _sharedItemsSubscription = repository.watchSharedListItems().listen(
+        (_) {},
+        onError: (error, stackTrace) async {
+          debugPrint('SHARED_ITEMS_LISTENER_ERROR: $error');
+
+          await _sharedItemsSubscription?.cancel();
+          _sharedItemsSubscription = null;
+        },
+      );
+    } catch (error, stackTrace) {
+      debugPrint('START_SHARED_ITEMS_LISTENER_ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   Future<void> _checkTodayPlannedItemsNotification() async {
@@ -395,14 +423,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                     final result = await showModalBottomSheet<bool>(
                       context: context,
+
                       backgroundColor: Colors.transparent,
+
                       isScrollControlled: true,
+
                       builder: (_) => const ShareListBottomSheet(),
                     );
 
                     if (result == true && mounted) {
-                      ref.invalidate(allItemsProvider);
-                      ref.invalidate(groupedItemsProvider);
+                      await _startSharedItemsListener();
+
                       ref.invalidate(categoriesProvider);
                     }
                   },
