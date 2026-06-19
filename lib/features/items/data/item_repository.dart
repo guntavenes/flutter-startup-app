@@ -20,9 +20,6 @@ class ItemRepository {
 
   Future<CollectionReference<Map<String, dynamic>>> _itemsCollection() async {
     final listRef = await _sharedListRepository.getActiveListRef();
-
-    debugPrint('ITEM_WRITE_PATH=${listRef.collection('items').path}');
-
     return listRef.collection('items');
   }
 
@@ -158,11 +155,7 @@ class ItemRepository {
   Stream<void> watchSharedListItems() async* {
     final collection = await _itemsCollection();
 
-    debugPrint('ITEM_LISTENER_PATH=${collection.path}');
-
     yield* collection.snapshots().asyncMap((snapshot) async {
-      debugPrint('ITEM_LISTENER_DOC_COUNT=${snapshot.docs.length}');
-
       for (final doc in snapshot.docs) {
         final data = doc.data();
 

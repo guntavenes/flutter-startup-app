@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_startup_app/features/shared_lists/data/shared_list_repository.dart';
 
 import '../../../core/database/app_database.dart';
@@ -18,6 +19,10 @@ class CategoryRepository {
   _categoriesCollection() async {
     final listRef = await _sharedListRepository.getActiveListRef();
     return listRef.collection('categories');
+  }
+
+  Stream<List<Category>> watchAll() {
+    return _db.select(_db.categories).watch();
   }
 
   Future<void> insertDefaultCategories() async {
@@ -162,38 +167,29 @@ class CategoryRepository {
     final collection = await _categoriesCollection();
 
     yield* collection.snapshots().asyncMap((snapshot) async {
-      if (snapshot.docs.isEmpty) {
-        return;
-      }
-
-      final remoteIds = <int>{};
-
       for (final doc in snapshot.docs) {
         final data = doc.data();
+
+        final isDeleted = data['isDeleted'] as bool? ?? false;
         final id = data['id'] as int;
 
-        remoteIds.add(id);
+        if (isDeleted) {
+          await (_db.delete(
+            _db.categories,
+          )..where((tbl) => tbl.id.equals(id))).go();
+          continue;
+        }
 
         await _db
             .into(_db.categories)
             .insertOnConflictUpdate(
               CategoriesCompanion(
-                id: Value(id),
+                id: Value(data['id'] as int),
                 name: Value(data['name'] as String),
                 iconName: Value(data['iconName'] as String? ?? 'category'),
                 createdAt: Value(data['createdAt'] as int),
               ),
             );
-      }
-
-      final localCategories = await getAll();
-
-      for (final category in localCategories) {
-        if (!remoteIds.contains(category.id)) {
-          await (_db.delete(
-            _db.categories,
-          )..where((tbl) => tbl.id.equals(category.id))).go();
-        }
       }
     });
   }
@@ -212,7 +208,17 @@ class CategoryRepository {
     )..where((tbl) => tbl.id.equals(category.id))).go();
 
     final collection = await _categoriesCollection();
-    await collection.doc(category.id.toString()).delete();
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    await collection.doc(category.id.toString()).set({
+      'id': category.id,
+      'name': category.name,
+      'iconName': category.iconName,
+      'createdAt': category.createdAt,
+      'isDeleted': true,
+      'deletedAt': now,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
   }
 
   Future<void> updateDefaultCategoryIcons() async {

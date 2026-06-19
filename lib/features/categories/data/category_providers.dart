@@ -12,13 +12,9 @@ final categoryRepositoryProvider = Provider<CategoryRepository>((ref) {
   return CategoryRepository(db, sharedListRepository);
 });
 
-final categoriesProvider = FutureProvider<List<Category>>((ref) async {
+final categoriesProvider = StreamProvider<List<Category>>((ref) {
   final repo = ref.watch(categoryRepositoryProvider);
-
-  await repo.insertDefaultCategories();
-  await repo.syncCategoriesFromFirestore();
-
-  return repo.getAll();
+  return repo.watchAll();
 });
 
 final sharedCategoriesSyncProvider = StreamProvider<void>((ref) {

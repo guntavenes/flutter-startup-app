@@ -36,12 +36,14 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   StreamSubscription<void>? _sharedItemsSubscription;
+  StreamSubscription<void>? _sharedCategoriesSubscription;
 
   @override
   void initState() {
     super.initState();
 
     Future.microtask(_startSharedItemsListener);
+    Future.microtask(_startSharedCategoriesListener);
 
     Future.microtask(() async {
       try {
@@ -51,12 +53,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           return;
         }
 
+        final categoryRepository = ref.read(categoryRepositoryProvider);
+
+        await categoryRepository.insertDefaultCategories();
+
+        await categoryRepository.syncCategoriesFromFirestore();
+
         final itemRepository = ref.read(itemRepositoryProvider);
 
         await itemRepository.syncItemsFromFirestore();
-
-        ref.invalidate(allItemsProvider);
-        ref.invalidate(groupedItemsProvider);
       } catch (error, stackTrace) {
         debugPrint('HOME_INIT_ERROR: $error');
         debugPrintStack(stackTrace: stackTrace);
@@ -255,6 +260,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  Future<void> _startSharedCategoriesListener() async {
+    try {
+      await _sharedCategoriesSubscription?.cancel();
+      _sharedCategoriesSubscription = null;
+
+      final repository = ref.read(categoryRepositoryProvider);
+
+      await repository.syncCategoriesFromFirestore();
+
+      _sharedCategoriesSubscription = repository
+          .watchSharedListCategories()
+          .listen(
+            (_) {},
+            onError: (error, stackTrace) {
+              debugPrint('SHARED_CATEGORIES_LISTENER_ERROR: $error');
+              debugPrintStack(stackTrace: stackTrace);
+            },
+          );
+    } catch (error, stackTrace) {
+      debugPrint('START_SHARED_CATEGORIES_LISTENER_ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
+
   Widget _buildSummary(List<Item> items) {
     final total = items.length;
     final purchased = items.where((e) => e.isPurchased).length;
@@ -433,7 +462,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                     if (result == true && mounted) {
                       await _startSharedItemsListener();
-
+                      await _startSharedCategoriesListener();
                       ref.invalidate(categoriesProvider);
                     }
                   },
