@@ -73,6 +73,12 @@ class SharedListRepository {
     final listDoc = snapshot.docs.first;
     final listId = listDoc.id;
 
+    final activeListId = await getActiveListId();
+
+    if (activeListId == listId) {
+      throw Exception('Zaten bu listedesin.');
+    }
+
     await listDoc.reference.collection('members').doc(user.uid).set({
       'uid': user.uid,
       'email': user.email,
@@ -247,5 +253,38 @@ class SharedListRepository {
             'updatedAt': FieldValue.serverTimestamp(),
           }, SetOptions(merge: true));
     }
+  }
+
+  Future<String> leaveActiveSharedList() async {
+    final user = await _requireCurrentUser();
+    final activeListRef = await getActiveListRef();
+
+    await activeListRef.collection('members').doc(user.uid).delete();
+
+    final newListId = await createList();
+
+    await _firestore.collection('users').doc(user.uid).set({
+      'activeListId': newListId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    return newListId;
+  }
+
+  Stream<List<SharedMember>> watchMembers() async* {
+    final listRef = await getActiveListRef();
+
+    yield* listRef.collection('members').snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+
+        return SharedMember(
+          uid: data['uid'] as String,
+          email: data['email'] as String?,
+          displayName: data['displayName'] as String?,
+          role: data['role'] as String? ?? 'editor',
+        );
+      }).toList();
+    });
   }
 }

@@ -17,6 +17,6 @@ final inviteCodeProvider = FutureProvider<String?>((ref) async {
   return repository.getInviteCode();
 });
 
-final membersProvider = FutureProvider<List<SharedMember>>((ref) async {
-  return ref.read(sharedListRepositoryProvider).getMembers();
+final membersProvider = StreamProvider<List<SharedMember>>((ref) {
+  return ref.watch(sharedListRepositoryProvider).watchMembers();
 });

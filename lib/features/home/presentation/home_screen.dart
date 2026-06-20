@@ -22,6 +22,7 @@ import 'package:flutter_startup_app/features/items/presentation/item_form_screen
 import 'package:flutter_startup_app/features/items/presentation/item_list_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/planned_items_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
+import 'package:flutter_startup_app/features/notifications/data/notification_providers.dart';
 import 'package:flutter_startup_app/features/shared_lists/presentation/share_list_bottom_sheet.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
 import 'package:flutter_startup_app/features/categories/presentation/category_management_screen.dart';
@@ -45,6 +46,27 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     Future.microtask(_startSharedItemsListener);
     Future.microtask(_startSharedCategoriesListener);
 
+    ref.listenManual(sharedNotificationsProvider, (previous, next) {
+      next.whenData((notifications) {
+        if (notifications.isEmpty) return;
+
+        final latest = notifications.first;
+
+        if (latest.createdBy == FirebaseAuth.instance.currentUser?.uid) {
+          return;
+        }
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(latest.message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      });
+    });
+
     Future.microtask(() async {
       try {
         final user = FirebaseAuth.instance.currentUser;
@@ -56,11 +78,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         final categoryRepository = ref.read(categoryRepositoryProvider);
 
         await categoryRepository.insertDefaultCategories();
-
         await categoryRepository.syncCategoriesFromFirestore();
 
         final itemRepository = ref.read(itemRepositoryProvider);
-
         await itemRepository.syncItemsFromFirestore();
       } catch (error, stackTrace) {
         debugPrint('HOME_INIT_ERROR: $error');
@@ -452,12 +472,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
                     final result = await showModalBottomSheet<bool>(
                       context: context,
-
                       backgroundColor: Colors.transparent,
-
                       isScrollControlled: true,
-
-                      builder: (_) => const ShareListBottomSheet(),
+                      enableDrag: true,
+                      isDismissible: true,
+                      builder: (_) => ShareListBottomSheet(
+                        onBeforeLeaveList: _stopSharedListeners,
+                      ),
                     );
 
                     if (result == true && mounted) {
@@ -530,6 +551,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         );
       },
     );
+  }
+
+  Future<void> _stopSharedListeners() async {
+    await _sharedItemsSubscription?.cancel();
+    _sharedItemsSubscription = null;
+
+    await _sharedCategoriesSubscription?.cancel();
+    _sharedCategoriesSubscription = null;
   }
 
   Widget _buildHomeMenuTile({

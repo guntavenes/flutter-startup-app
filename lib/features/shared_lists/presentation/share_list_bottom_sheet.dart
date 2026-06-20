@@ -8,8 +8,8 @@ import '../../categories/data/category_providers.dart';
 import '../data/shared_list_providers.dart';
 
 class ShareListBottomSheet extends ConsumerStatefulWidget {
-  const ShareListBottomSheet({super.key});
-
+  final Future<void> Function()? onBeforeLeaveList;
+  const ShareListBottomSheet({super.key, this.onBeforeLeaveList});
   @override
   ConsumerState<ShareListBottomSheet> createState() =>
       _ShareListBottomSheetState();
@@ -20,6 +20,7 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
   bool _isJoining = false;
   final TextEditingController _displayNameController = TextEditingController();
   bool _isSavingName = false;
+  bool _isCurrentListCode = false;
 
   @override
   void initState() {
@@ -65,6 +66,12 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
       return;
     }
 
+    final currentInviteCode = await ref.read(inviteCodeProvider.future);
+
+    if (code == currentInviteCode) {
+      return;
+    }
+
     setState(() {
       _isJoining = true;
     });
@@ -75,6 +82,7 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
       ref.invalidate(activeListIdProvider);
       ref.invalidate(inviteCodeProvider);
       ref.invalidate(itemRepositoryProvider);
+      ref.invalidate(membersProvider);
 
       await Future.delayed(const Duration(milliseconds: 200));
 
@@ -160,10 +168,95 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
     }
   }
 
+  Future<void> _onInviteCodeChanged(String value) async {
+    final code = value.trim().toUpperCase();
+
+    if (code.isEmpty) {
+      setState(() {
+        _isCurrentListCode = false;
+      });
+      return;
+    }
+
+    final currentCode = await ref.read(inviteCodeProvider.future);
+
+    if (!mounted) return;
+
+    setState(() {
+      _isCurrentListCode = currentCode == code;
+    });
+  }
+
+  Future<void> _leaveList() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Listeden ayrıl?'),
+          content: const Text(
+            'Bu ortak listeden ayrılacaksın. Mevcut ürünlerin telefonunda kalacak.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Vazgeç'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Ayrıl'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      await widget.onBeforeLeaveList?.call();
+      await ref.read(sharedListRepositoryProvider).leaveActiveSharedList();
+
+      ref.invalidate(activeListIdProvider);
+      ref.invalidate(inviteCodeProvider);
+      ref.invalidate(membersProvider);
+      ref.invalidate(categoriesProvider);
+
+      if (!mounted) return;
+
+      Navigator.of(context).pop(true);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Listeden ayrıldın.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final inviteCodeAsync = ref.watch(inviteCodeProvider);
+
     final membersAsync = ref.watch(membersProvider);
+
+    final currentInviteCode = inviteCodeAsync.value?.trim().toUpperCase();
+
+    final enteredInviteCode = _inviteCodeController.text.trim().toUpperCase();
+
+    final isCurrentListCode =
+        currentInviteCode != null &&
+        enteredInviteCode.isNotEmpty &&
+        enteredInviteCode == currentInviteCode;
 
     return Container(
       margin: const EdgeInsets.all(14),
@@ -205,13 +298,32 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
                 size: 38,
               ),
               const SizedBox(height: 10),
-              const Text(
-                'Listeyi Paylaş',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF2C1E26),
-                ),
+              Row(
+                children: [
+                  const Spacer(),
+
+                  const Text(
+                    'Listeyi Paylaş',
+
+                    style: TextStyle(
+                      fontSize: 22,
+
+                      fontWeight: FontWeight.w900,
+
+                      color: Color(0xFF2C1E26),
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  IconButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+
+                    icon: const Icon(Icons.close_rounded),
+
+                    color: Color(0xFF9A7A89),
+                  ),
+                ],
               ),
               const SizedBox(height: 6),
               const Text(
@@ -286,177 +398,183 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
                 },
               ),
 
-              const SizedBox(height: 18),
-
-              TextField(
-                controller: _displayNameController,
-                textCapitalization: TextCapitalization.words,
-                decoration: InputDecoration(
-                  labelText: 'Görünen ismin',
-                  hintText: 'Örn: Enes',
-                  prefixIcon: const Icon(Icons.person_rounded),
-                  filled: true,
-                  fillColor: const Color(0xFFFFF8FB),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 8),
-
-              SizedBox(
-                width: double.infinity,
-                height: 44,
-                child: ElevatedButton.icon(
-                  onPressed: _isSavingName ? null : _saveDisplayName,
-                  icon: _isSavingName
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save_rounded),
-                  label: Text(
-                    _isSavingName ? 'Kaydediliyor...' : 'İsmi Kaydet',
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFD96BA7),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 18),
-
-              Row(
-                children: [
-                  const Text(
-                    'Liste Üyeleri',
-
-                    style: TextStyle(
-                      fontSize: 16,
-
-                      fontWeight: FontWeight.w800,
-
-                      color: Color(0xFF2C1E26),
-                    ),
-                  ),
-
-                  const Spacer(),
-
-                  membersAsync.maybeWhen(
-                    data: (members) => Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-
-                        vertical: 4,
-                      ),
-
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF5FA),
-
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-
-                      child: Text(
-                        '${members.length} kişi',
-
-                        style: const TextStyle(
-                          fontSize: 12,
-
-                          fontWeight: FontWeight.w700,
-
-                          color: Color(0xFFD96BA7),
-                        ),
-                      ),
-                    ),
-
-                    orElse: () => const SizedBox.shrink(),
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 8),
-
               membersAsync.when(
-                loading: () => const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
+                loading: () => const SizedBox.shrink(),
                 error: (_, _) => const SizedBox.shrink(),
                 data: (members) {
-                  if (members.isEmpty) {
-                    return const Text(
-                      'Henüz üye bulunamadı.',
-                      style: TextStyle(
-                        color: Color(0xFF9A7A89),
-                        fontWeight: FontWeight.w600,
-                      ),
-                    );
+                  final isSharedList = members.length > 1;
+
+                  if (!isSharedList) {
+                    return const SizedBox.shrink();
                   }
 
                   return Column(
-                    children: members.map((member) {
-                      final name =
-                          member.displayName ?? member.email ?? 'Kullanıcı';
-                      final firstLetter = name.isEmpty
-                          ? '?'
-                          : name.substring(0, 1).toUpperCase();
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 18),
 
-                      return ListTile(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        leading: CircleAvatar(
-                          backgroundColor: const Color(0xFFFFD6EA),
-                          child: Text(
-                            firstLetter,
-                            style: const TextStyle(
-                              color: Color(0xFFD96BA7),
-                              fontWeight: FontWeight.w900,
+                      TextField(
+                        controller: _displayNameController,
+                        textCapitalization: TextCapitalization.words,
+                        decoration: InputDecoration(
+                          labelText: 'Görünen ismin',
+                          hintText: 'Örn: Enes',
+                          prefixIcon: const Icon(Icons.person_rounded),
+                          filled: true,
+                          fillColor: const Color(0xFFFFF8FB),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: ElevatedButton.icon(
+                          onPressed: _isSavingName ? null : _saveDisplayName,
+                          icon: _isSavingName
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.save_rounded),
+                          label: Text(
+                            _isSavingName ? 'Kaydediliyor...' : 'İsmi Kaydet',
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFD96BA7),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
                             ),
                           ),
                         ),
-                        title: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w800,
-                                  color: Color(0xFF2C1E26),
-                                ),
+                      ),
+
+                      const SizedBox(height: 18),
+
+                      Row(
+                        children: [
+                          const Text(
+                            'Liste Üyeleri',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF2C1E26),
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFFF5FA),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: Text(
+                              '${members.length} kişi',
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFFD96BA7),
                               ),
                             ),
-                            if (member.role == 'owner')
-                              const Text('👑', style: TextStyle(fontSize: 18)),
-                          ],
-                        ),
-                        subtitle: Text(
-                          member.role == 'owner'
-                              ? 'Liste Sahibi'
-                              : 'Ortak Kullanıcı',
-                          style: const TextStyle(
-                            color: Color(0xFF9A7A89),
-                            fontWeight: FontWeight.w600,
+                          ),
+                        ],
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      ...members.map((member) {
+                        final name =
+                            member.displayName ?? member.email ?? 'Kullanıcı';
+                        final firstLetter = name.isEmpty
+                            ? '?'
+                            : name.substring(0, 1).toUpperCase();
+
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFFFFD6EA),
+                            child: Text(
+                              firstLetter,
+                              style: const TextStyle(
+                                color: Color(0xFFD96BA7),
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          title: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    color: Color(0xFF2C1E26),
+                                  ),
+                                ),
+                              ),
+                              if (member.role == 'owner')
+                                const Text(
+                                  '👑',
+                                  style: TextStyle(fontSize: 18),
+                                ),
+                            ],
+                          ),
+                          subtitle: Text(
+                            member.role == 'owner'
+                                ? 'Liste Sahibi'
+                                : 'Ortak Kullanıcı',
+                            style: const TextStyle(
+                              color: Color(0xFF9A7A89),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        );
+                      }),
+
+                      const SizedBox(height: 10),
+
+                      SizedBox(
+                        width: double.infinity,
+                        height: 46,
+                        child: OutlinedButton.icon(
+                          onPressed: _isJoining ? null : _leaveList,
+                          icon: const Icon(Icons.logout_rounded),
+                          label: const Text('Listeden Ayrıl'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.redAccent,
+                            side: const BorderSide(color: Colors.redAccent),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
                           ),
                         ),
-                      );
-                    }).toList(),
+                      ),
+                    ],
                   );
                 },
               ),
 
+              const SizedBox(height: 18),
               const Divider(),
               const SizedBox(height: 12),
 
               TextField(
                 controller: _inviteCodeController,
+                onChanged: (_) => setState(() {}),
                 textCapitalization: TextCapitalization.characters,
                 decoration: InputDecoration(
                   labelText: 'Davet kodu gir',
@@ -470,13 +588,26 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
                   ),
                 ),
               ),
+
+              if (isCurrentListCode)
+                const Padding(
+                  padding: EdgeInsets.only(top: 8),
+                  child: Text(
+                    'Bu senin aktif listen.',
+                    style: TextStyle(
+                      color: Colors.orange,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+
               const SizedBox(height: 12),
 
               SizedBox(
                 width: double.infinity,
                 height: 50,
                 child: OutlinedButton.icon(
-                  onPressed: _isJoining ? null : _joinList,
+                  onPressed: _isJoining || isCurrentListCode ? null : _joinList,
                   icon: _isJoining
                       ? const SizedBox(
                           width: 18,
@@ -484,10 +615,20 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.login_rounded),
-                  label: Text(_isJoining ? 'Katılınıyor...' : 'Listeye Katıl'),
+                  label: Text(
+                    isCurrentListCode
+                        ? 'Zaten Bu Listedesin'
+                        : (_isJoining ? 'Katılınıyor...' : 'Listeye Katıl'),
+                  ),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFFD96BA7),
-                    side: const BorderSide(color: Color(0xFFD96BA7)),
+                    foregroundColor: isCurrentListCode
+                        ? Colors.grey
+                        : const Color(0xFFD96BA7),
+                    side: BorderSide(
+                      color: isCurrentListCode
+                          ? Colors.grey.shade300
+                          : const Color(0xFFD96BA7),
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(18),
                     ),

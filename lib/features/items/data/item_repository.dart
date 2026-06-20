@@ -3,16 +3,22 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_startup_app/features/notifications/data/notification_repository.dart';
 import 'package:flutter_startup_app/features/shared_lists/data/shared_list_repository.dart';
 
 import '../../../core/database/app_database.dart';
 
 class ItemRepository {
-  ItemRepository(this._database, this._sharedListRepository);
+  final NotificationRepository _notificationRepository;
+
+  ItemRepository(
+    this._database,
+    this._sharedListRepository,
+    this._notificationRepository,
+  );
 
   final AppDatabase _database;
   final SharedListRepository _sharedListRepository;
-  bool _isSyncingToFirestore = false;
 
   Future<List<Item>> getAllItems() {
     return _database.select(_database.items).get();
@@ -244,12 +250,14 @@ class ItemRepository {
   }
 
   Future<int> togglePurchased(Item item) async {
+    final newIsPurchased = !item.isPurchased;
+
     final result =
         await (_database.update(
           _database.items,
         )..where((tbl) => tbl.id.equals(item.id))).write(
           ItemsCompanion(
-            isPurchased: Value(!item.isPurchased),
+            isPurchased: Value(newIsPurchased),
             updateAt: Value(DateTime.now().millisecondsSinceEpoch),
           ),
         );
@@ -259,6 +267,16 @@ class ItemRepository {
     )..where((tbl) => tbl.id.equals(item.id))).getSingle();
 
     await _setItemToFirestore(updatedItem);
+
+    if (newIsPurchased) {
+      try {
+        await _notificationRepository.addItemPurchasedNotification(
+          itemName: updatedItem.name,
+        );
+      } catch (error) {
+        debugPrint('ADD_NOTIFICATION_ERROR: $error');
+      }
+    }
 
     return result;
   }
@@ -287,6 +305,16 @@ class ItemRepository {
     )..where((tbl) => tbl.id.equals(item.id))).getSingle();
 
     await _setItemToFirestore(updatedItem);
+
+    if (!item.isPurchased) {
+      try {
+        await _notificationRepository.addItemPurchasedNotification(
+          itemName: updatedItem.name,
+        );
+      } catch (error) {
+        debugPrint('ADD_NOTIFICATION_ERROR: $error');
+      }
+    }
 
     return result;
   }
@@ -392,13 +420,9 @@ class ItemRepository {
     final collection = await _itemsCollection();
     final snapshot = await collection.get();
 
-    final remoteIds = <int>{};
-
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final id = data['id'] as int;
-
-      remoteIds.add(id);
 
       await _database
           .into(_database.items)
@@ -427,16 +451,6 @@ class ItemRepository {
               ),
             ),
           );
-    }
-
-    final localItems = await getAllItems();
-
-    for (final item in localItems) {
-      if (!remoteIds.contains(item.id)) {
-        await (_database.delete(
-          _database.items,
-        )..where((tbl) => tbl.id.equals(item.id))).go();
-      }
     }
   }
 
