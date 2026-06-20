@@ -1,10 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
 
 import '../../categories/data/category_providers.dart';
-import '../../items/data/item_providers.dart' hide sharedItemsSyncProvider;
 import '../data/shared_list_providers.dart';
 
 class ShareListBottomSheet extends ConsumerStatefulWidget {
@@ -18,10 +18,21 @@ class ShareListBottomSheet extends ConsumerStatefulWidget {
 class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
   final TextEditingController _inviteCodeController = TextEditingController();
   bool _isJoining = false;
+  final TextEditingController _displayNameController = TextEditingController();
+  bool _isSavingName = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final user = FirebaseAuth.instance.currentUser;
+    _displayNameController.text = user?.displayName ?? '';
+  }
 
   @override
   void dispose() {
     _inviteCodeController.dispose();
+    _displayNameController.dispose();
     super.dispose();
   }
 
@@ -108,9 +119,51 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
     }
   }
 
+  Future<void> _saveDisplayName() async {
+    final name = _displayNameController.text.trim();
+
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('İsim boş olamaz.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isSavingName = true;
+    });
+
+    try {
+      await ref
+          .read(sharedListRepositoryProvider)
+          .updateCurrentUserDisplayName(name);
+
+      ref.invalidate(membersProvider);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('İsim güncellendi.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSavingName = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final inviteCodeAsync = ref.watch(inviteCodeProvider);
+    final membersAsync = ref.watch(membersProvider);
 
     return Container(
       margin: const EdgeInsets.all(14),
@@ -171,6 +224,7 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
                 ),
               ),
               const SizedBox(height: 20),
+
               inviteCodeAsync.when(
                 loading: () => const CircularProgressIndicator(),
                 error: (error, _) => Text(
@@ -231,9 +285,176 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
                   );
                 },
               ),
+
               const SizedBox(height: 18),
+
+              TextField(
+                controller: _displayNameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: InputDecoration(
+                  labelText: 'Görünen ismin',
+                  hintText: 'Örn: Enes',
+                  prefixIcon: const Icon(Icons.person_rounded),
+                  filled: true,
+                  fillColor: const Color(0xFFFFF8FB),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 8),
+
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: ElevatedButton.icon(
+                  onPressed: _isSavingName ? null : _saveDisplayName,
+                  icon: _isSavingName
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save_rounded),
+                  label: Text(
+                    _isSavingName ? 'Kaydediliyor...' : 'İsmi Kaydet',
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFD96BA7),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              Row(
+                children: [
+                  const Text(
+                    'Liste Üyeleri',
+
+                    style: TextStyle(
+                      fontSize: 16,
+
+                      fontWeight: FontWeight.w800,
+
+                      color: Color(0xFF2C1E26),
+                    ),
+                  ),
+
+                  const Spacer(),
+
+                  membersAsync.maybeWhen(
+                    data: (members) => Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+
+                        vertical: 4,
+                      ),
+
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFF5FA),
+
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+
+                      child: Text(
+                        '${members.length} kişi',
+
+                        style: const TextStyle(
+                          fontSize: 12,
+
+                          fontWeight: FontWeight.w700,
+
+                          color: Color(0xFFD96BA7),
+                        ),
+                      ),
+                    ),
+
+                    orElse: () => const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+
+              const SizedBox(height: 8),
+
+              membersAsync.when(
+                loading: () => const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+                error: (_, _) => const SizedBox.shrink(),
+                data: (members) {
+                  if (members.isEmpty) {
+                    return const Text(
+                      'Henüz üye bulunamadı.',
+                      style: TextStyle(
+                        color: Color(0xFF9A7A89),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    );
+                  }
+
+                  return Column(
+                    children: members.map((member) {
+                      final name =
+                          member.displayName ?? member.email ?? 'Kullanıcı';
+                      final firstLetter = name.isEmpty
+                          ? '?'
+                          : name.substring(0, 1).toUpperCase();
+
+                      return ListTile(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: const Color(0xFFFFD6EA),
+                          child: Text(
+                            firstLetter,
+                            style: const TextStyle(
+                              color: Color(0xFFD96BA7),
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                        ),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF2C1E26),
+                                ),
+                              ),
+                            ),
+                            if (member.role == 'owner')
+                              const Text('👑', style: TextStyle(fontSize: 18)),
+                          ],
+                        ),
+                        subtitle: Text(
+                          member.role == 'owner'
+                              ? 'Liste Sahibi'
+                              : 'Ortak Kullanıcı',
+                          style: const TextStyle(
+                            color: Color(0xFF9A7A89),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  );
+                },
+              ),
+
               const Divider(),
               const SizedBox(height: 12),
+
               TextField(
                 controller: _inviteCodeController,
                 textCapitalization: TextCapitalization.characters,
@@ -250,6 +471,7 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
                 ),
               ),
               const SizedBox(height: 12),
+
               SizedBox(
                 width: double.infinity,
                 height: 50,

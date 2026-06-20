@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_startup_app/features/shared_lists/models/shared_member.dart';
 
 class SharedListRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -86,6 +87,23 @@ class SharedListRepository {
     }, SetOptions(merge: true));
 
     return listId;
+  }
+
+  Future<List<SharedMember>> getMembers() async {
+    final listRef = await getActiveListRef();
+
+    final snapshot = await listRef.collection('members').get();
+
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+
+      return SharedMember(
+        uid: data['uid'] as String,
+        email: data['email'] as String?,
+        displayName: data['displayName'] as String?,
+        role: data['role'] as String? ?? 'editor',
+      );
+    }).toList();
   }
 
   Future<String> ensureActiveListForUser(User user) async {
@@ -197,5 +215,37 @@ class SharedListRepository {
     final listId = await ensureActiveList();
 
     return _firestore.collection('sharedLists').doc(listId);
+  }
+
+  Future<void> updateCurrentUserDisplayName(String displayName) async {
+    final user = await _requireCurrentUser();
+    final trimmedName = displayName.trim();
+
+    if (trimmedName.isEmpty) return;
+
+    await user.updateDisplayName(trimmedName);
+
+    await _firestore.collection('users').doc(user.uid).set({
+      'uid': user.uid,
+      'displayName': trimmedName,
+      'email': user.email,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    final activeListId = await getActiveListId();
+
+    if (activeListId != null && activeListId.isNotEmpty) {
+      await _firestore
+          .collection('sharedLists')
+          .doc(activeListId)
+          .collection('members')
+          .doc(user.uid)
+          .set({
+            'uid': user.uid,
+            'email': user.email,
+            'displayName': trimmedName,
+            'updatedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+    }
   }
 }
