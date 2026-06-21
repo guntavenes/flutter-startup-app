@@ -23,6 +23,8 @@ import 'package:flutter_startup_app/features/items/presentation/item_list_screen
 import 'package:flutter_startup_app/features/items/presentation/planned_items_screen.dart';
 import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
 import 'package:flutter_startup_app/features/notifications/data/notification_providers.dart';
+import 'package:flutter_startup_app/features/notifications/models/shared_notification.dart';
+import 'package:flutter_startup_app/features/notifications/presentation/shared_notifications_screen.dart';
 import 'package:flutter_startup_app/features/shared_lists/presentation/share_list_bottom_sheet.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
 import 'package:flutter_startup_app/features/categories/presentation/category_management_screen.dart';
@@ -38,6 +40,15 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   StreamSubscription<void>? _sharedItemsSubscription;
   StreamSubscription<void>? _sharedCategoriesSubscription;
+
+  @override
+  void dispose() {
+    _sharedItemsSubscription?.cancel();
+
+    _sharedCategoriesSubscription?.cancel();
+
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -293,9 +304,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           .watchSharedListCategories()
           .listen(
             (_) {},
-            onError: (error, stackTrace) {
+            onError: (error, stackTrace) async {
               debugPrint('SHARED_CATEGORIES_LISTENER_ERROR: $error');
-              debugPrintStack(stackTrace: stackTrace);
+
+              await _sharedCategoriesSubscription?.cancel();
+              _sharedCategoriesSubscription = null;
             },
           );
     } catch (error, stackTrace) {
@@ -305,14 +318,33 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildSummary(List<Item> items) {
+    final notificationsAsync = ref.watch(sharedNotificationsProvider);
+
     final total = items.length;
+
     final purchased = items.where((e) => e.isPurchased).length;
+
     final remaining = total - purchased;
-    final upcomingItems = _getUpcomingItems(items);
 
     final totalExpense = items
         .where((e) => e.isPurchased)
         .fold<double>(0, (sum, item) => sum + (item.purchasedPrice ?? 0));
+
+    final upcomingItems = items.where((item) {
+      if (item.isPurchased || item.estimatedPurchaseDate == null) {
+        return false;
+      }
+
+      final today = DateTime.now();
+
+      final targetDate = DateTime.fromMillisecondsSinceEpoch(
+        item.estimatedPurchaseDate!,
+      );
+
+      return targetDate.year == today.year &&
+          targetDate.month == today.month &&
+          targetDate.day == today.day;
+    }).toList();
 
     return Column(
       children: [
@@ -320,41 +352,91 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: [
             _summaryCard(
               'Toplam',
+
               total.toString(),
+
               Icons.list_alt_rounded,
+
               const Color(0xFFFF8DBA),
+
               onTap: () => _openItemList('Tüm Ürünler', items, ItemFilter.all),
             ),
+
             const SizedBox(width: 10),
+
             _summaryCard(
               'Alınan',
+
               purchased.toString(),
+
               Icons.check_circle_rounded,
+
               const Color(0xFF7ACFA6),
+
               onTap: () => _openItemList(
                 'Alınan Ürünler',
+
                 items.where((e) => e.isPurchased).toList(),
+
                 ItemFilter.purchased,
               ),
             ),
+
             const SizedBox(width: 10),
+
             _summaryCard(
               'Kalan',
+
               remaining.toString(),
+
               Icons.hourglass_bottom_rounded,
+
               const Color(0xFFFFB74D),
+
               onTap: () => _openItemList(
                 'Kalan Ürünler',
+
                 items.where((e) => !e.isPurchased).toList(),
+
                 ItemFilter.remaining,
               ),
             ),
           ],
         ),
+
         const SizedBox(height: 10),
+
         _expenseCard(totalExpense, items),
+
+        notificationsAsync.when(
+          data: (notifications) {
+            final currentUid = FirebaseAuth.instance.currentUser?.uid;
+
+            final otherNotifications = notifications
+                .where((n) => n.createdBy != currentUid)
+                .toList();
+
+            if (otherNotifications.isEmpty) {
+              return const SizedBox.shrink();
+            }
+
+            return Column(
+              children: [
+                const SizedBox(height: 14),
+
+                _buildSharedActivityCard(otherNotifications),
+              ],
+            );
+          },
+
+          loading: () => const SizedBox.shrink(),
+
+          error: (_, _) => const SizedBox.shrink(),
+        ),
+
         if (upcomingItems.isNotEmpty) ...[
           const SizedBox(height: 14),
+
           _buildUpcomingCard(upcomingItems),
         ],
       ],
@@ -1008,6 +1090,66 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildSharedActivityCard(List<SharedNotification> notifications) {
+    final latest = notifications.first;
+
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const SharedNotificationsScreen()),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE7D6FF)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF3EEFF),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: const Icon(Icons.groups_rounded, color: Color(0xFF8B5CF6)),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${notifications.length} ortak liste hareketi',
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF2C1E26),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    latest.message,
+                    style: const TextStyle(
+                      color: Color(0xFF8A6B79),
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded, color: Color(0xFF8A6B79)),
+          ],
+        ),
       ),
     );
   }

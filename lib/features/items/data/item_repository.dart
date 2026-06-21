@@ -271,6 +271,7 @@ class ItemRepository {
     if (newIsPurchased) {
       try {
         await _notificationRepository.addItemPurchasedNotification(
+          itemId: updatedItem.id,
           itemName: updatedItem.name,
         );
       } catch (error) {
@@ -310,6 +311,7 @@ class ItemRepository {
       try {
         await _notificationRepository.addItemPurchasedNotification(
           itemName: updatedItem.name,
+          itemId: updatedItem.id,
         );
       } catch (error) {
         debugPrint('ADD_NOTIFICATION_ERROR: $error');
@@ -472,5 +474,11 @@ class ItemRepository {
 
       await Future<void>.delayed(const Duration(milliseconds: 20));
     }
+  }
+
+  Future<Item> getById(int id) {
+    return (_database.select(
+      _database.items,
+    )..where((tbl) => tbl.id.equals(id))).getSingle();
   }
 }

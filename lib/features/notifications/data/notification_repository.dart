@@ -16,16 +16,20 @@ class NotificationRepository {
     this._sharedListRepository,
   );
 
-  Future<void> addItemPurchasedNotification({required String itemName}) async {
+  Future<void> addItemPurchasedNotification({
+    required int itemId,
+    required String itemName,
+  }) async {
     final user = _auth.currentUser;
     if (user == null) return;
 
     final listRef = await _sharedListRepository.getActiveListRef();
-
     final displayName = user.displayName ?? 'Bir kullanıcı';
 
     await listRef.collection('notifications').add({
       'type': 'item_purchased',
+      'itemId': itemId,
+      'itemName': itemName,
       'message': '$displayName, $itemName ürününü aldı.',
       'createdBy': user.uid,
       'createdAt': DateTime.now().millisecondsSinceEpoch,
@@ -54,6 +58,8 @@ class NotificationRepository {
               message: data['message'] as String,
               createdBy: data['createdBy'] as String,
               createdAt: data['createdAt'] as int,
+              itemId: data['itemId'] as int?,
+              itemName: data['itemName'] as String?,
             );
           }).toList();
         });
