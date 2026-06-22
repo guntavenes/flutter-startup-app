@@ -25,6 +25,7 @@ import 'package:flutter_startup_app/features/items/presentation/recent_purchased
 import 'package:flutter_startup_app/features/notifications/data/notification_providers.dart';
 import 'package:flutter_startup_app/features/notifications/models/shared_notification.dart';
 import 'package:flutter_startup_app/features/notifications/presentation/shared_notifications_screen.dart';
+import 'package:flutter_startup_app/features/shared_lists/models/shared_member.dart';
 import 'package:flutter_startup_app/features/shared_lists/presentation/share_list_bottom_sheet.dart';
 import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
 import 'package:flutter_startup_app/features/categories/presentation/category_management_screen.dart';
@@ -56,27 +57,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     Future.microtask(_startSharedItemsListener);
     Future.microtask(_startSharedCategoriesListener);
-
-    ref.listenManual(sharedNotificationsProvider, (previous, next) {
-      next.whenData((notifications) {
-        if (notifications.isEmpty) return;
-
-        final latest = notifications.first;
-
-        if (latest.createdBy == FirebaseAuth.instance.currentUser?.uid) {
-          return;
-        }
-
-        if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(latest.message),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      });
-    });
 
     Future.microtask(() async {
       try {
@@ -318,6 +298,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildSummary(List<Item> items) {
+    final membersAsync = ref.watch(membersProvider);
     final notificationsAsync = ref.watch(sharedNotificationsProvider);
 
     final total = items.length;
@@ -408,29 +389,44 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
         _expenseCard(totalExpense, items),
 
-        notificationsAsync.when(
-          data: (notifications) {
-            final currentUid = FirebaseAuth.instance.currentUser?.uid;
-
-            final otherNotifications = notifications
-                .where((n) => n.createdBy != currentUid)
-                .toList();
-
-            if (otherNotifications.isEmpty) {
+        membersAsync.when(
+          data: (members) {
+            if (members.length <= 1) {
               return const SizedBox.shrink();
             }
 
-            return Column(
-              children: [
-                const SizedBox(height: 14),
+            return notificationsAsync.when(
+              data: (notifications) {
+                final currentUid = FirebaseAuth.instance.currentUser?.uid;
 
-                _buildSharedActivityCard(otherNotifications),
-              ],
+                final myMember = members
+                    .where((m) => m.uid == currentUid)
+                    .cast<SharedMember?>()
+                    .firstOrNull;
+
+                final joinedAtMs = myMember?.joinedAtMs ?? 0;
+
+                final otherNotifications = notifications
+                    .where((n) => n.createdBy != currentUid)
+                    .where((n) => n.createdAt >= joinedAtMs)
+                    .toList();
+
+                if (otherNotifications.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                return Column(
+                  children: [
+                    const SizedBox(height: 14),
+                    _buildSharedActivityCard(otherNotifications),
+                  ],
+                );
+              },
+              loading: () => const SizedBox.shrink(),
+              error: (_, _) => const SizedBox.shrink(),
             );
           },
-
           loading: () => const SizedBox.shrink(),
-
           error: (_, _) => const SizedBox.shrink(),
         ),
 

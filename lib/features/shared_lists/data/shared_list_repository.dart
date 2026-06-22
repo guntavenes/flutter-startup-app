@@ -37,6 +37,7 @@ class SharedListRepository {
       'inviteCode': inviteCode,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
+      'joinedAtMs': DateTime.now().millisecondsSinceEpoch,
     });
 
     await listRef.collection('members').doc(user.uid).set({
@@ -45,6 +46,7 @@ class SharedListRepository {
       'displayName': user.displayName,
       'role': 'owner',
       'joinedAt': FieldValue.serverTimestamp(),
+      'joinedAtMs': DateTime.now().millisecondsSinceEpoch,
     });
 
     await _firestore.collection('users').doc(user.uid).set({
@@ -85,6 +87,7 @@ class SharedListRepository {
       'displayName': user.displayName,
       'role': 'editor',
       'joinedAt': FieldValue.serverTimestamp(),
+      'joinedAtMs': DateTime.now().millisecondsSinceEpoch,
     }, SetOptions(merge: true));
 
     await _firestore.collection('users').doc(user.uid).set({
@@ -108,6 +111,7 @@ class SharedListRepository {
         email: data['email'] as String?,
         displayName: data['displayName'] as String?,
         role: data['role'] as String? ?? 'editor',
+        joinedAtMs: data['joinedAtMs'] as int? ?? 0,
       );
     }).toList();
   }
@@ -283,6 +287,7 @@ class SharedListRepository {
           email: data['email'] as String?,
           displayName: data['displayName'] as String?,
           role: data['role'] as String? ?? 'editor',
+          joinedAtMs: data['joinedAtMs'] as int? ?? 0,
         );
       }).toList();
     });

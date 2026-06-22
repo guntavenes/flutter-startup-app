@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
+import 'package:flutter_startup_app/features/notifications/data/notification_providers.dart';
 
 import '../../categories/data/category_providers.dart';
 import '../data/shared_list_providers.dart';
@@ -91,7 +92,6 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
 
       await categoryRepository.syncCategoriesFromFirestore();
 
-      await itemRepository.mergeLocalItemsToActiveSharedList();
       await itemRepository.syncItemsFromFirestore();
 
       ref.invalidate(categoriesProvider);
@@ -214,12 +214,15 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
 
     try {
       await widget.onBeforeLeaveList?.call();
+
       await ref.read(sharedListRepositoryProvider).leaveActiveSharedList();
 
       ref.invalidate(activeListIdProvider);
       ref.invalidate(inviteCodeProvider);
       ref.invalidate(membersProvider);
       ref.invalidate(categoriesProvider);
+      ref.invalidate(notificationRepositoryProvider);
+      ref.invalidate(sharedNotificationsProvider);
 
       if (!mounted) return;
 

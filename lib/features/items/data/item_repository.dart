@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_startup_app/features/notifications/data/notification_repository.dart';
 import 'package:flutter_startup_app/features/shared_lists/data/shared_list_repository.dart';
@@ -48,88 +49,93 @@ class ItemRepository {
     final collection = await _itemsCollection();
     final snapshot = await collection.get();
 
-    final remoteItems = snapshot.docs.map((doc) => doc.data()).toList();
+    final remoteItems = snapshot.docs.map((doc) {
+      return {...doc.data(), '_docId': doc.id};
+    }).toList();
 
     for (final localItem in localItems) {
-      final matchingRemote = remoteItems.where((remote) {
+      final localName = _normalizeItemName(localItem.name);
+
+      final existsRemoteSameItem = remoteItems.any((remote) {
+        final remoteName = _normalizeItemName(remote['name'] as String);
+
         return remote['categoryId'] == localItem.categoryId &&
-            (remote['name'] as String).trim().toLowerCase() ==
-                localItem.name.trim().toLowerCase();
-      }).firstOrNull;
+            remoteName == localName;
+      });
 
-      if (matchingRemote == null) {
-        final newDoc = collection.doc();
-        final newId = DateTime.now().microsecondsSinceEpoch;
-
-        final map = _itemToMap(localItem);
-        map['id'] = newId;
-        map['syncedAt'] = FieldValue.serverTimestamp();
-
-        await newDoc.set(map);
-
-        remoteItems.add(map);
-
+      // Sadece alınmayan ürünlerde duplicate engelle
+      if (!localItem.isPurchased && existsRemoteSameItem) {
         continue;
       }
 
-      final remoteIsPurchased = matchingRemote['isPurchased'] as bool? ?? false;
+      // Alınan ürünlerde her zaman ekle
+      final newDoc = collection.doc();
+      final newId = DateTime.now().microsecondsSinceEpoch;
 
-      // İkisi de alınmışsa ayrı ürün oluştur
-      if (localItem.isPurchased && remoteIsPurchased) {
-        final itemName = _generateUniqueItemName(
-          baseName: localItem.name,
-          categoryId: localItem.categoryId,
-          remoteItems: remoteItems,
-        );
+      final map = _itemToMap(localItem);
+      map['id'] = newId;
+      map['name'] = localItem.name.trim();
+      map['syncedAt'] = FieldValue.serverTimestamp();
 
-        final newDoc = collection.doc();
-        final newId = DateTime.now().microsecondsSinceEpoch;
+      await newDoc.set(map);
 
-        final map = _itemToMap(localItem);
-        map['id'] = newId;
-        map['name'] = itemName;
-        map['syncedAt'] = FieldValue.serverTimestamp();
+      remoteItems.add({...map, '_docId': newDoc.id});
+    }
+  }
 
-        await newDoc.set(map);
+  String _normalizeItemName(String name) {
+    return name
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'\s+\(\d+\)$'), '')
+        .replaceAll(RegExp(r'\s+\d+$'), '');
+  }
 
-        remoteItems.add(map);
+  Future<void> cleanupDuplicateRemoteItems() async {
+    final collection = await _itemsCollection();
+    final snapshot = await collection.get();
 
-        continue;
+    final grouped = <String, List<Map<String, dynamic>>>{};
+
+    for (final doc in snapshot.docs) {
+      final data = doc.data();
+
+      final categoryId = data['categoryId'];
+      final name = _normalizeItemName(data['name'] as String);
+      final key = '$categoryId|$name';
+
+      grouped.putIfAbsent(key, () => []);
+      grouped[key]!.add({...data, '_docId': doc.id});
+    }
+
+    for (final entry in grouped.entries) {
+      final items = entry.value;
+
+      if (items.length <= 1) continue;
+
+      items.sort((a, b) {
+        final aPurchased = a['isPurchased'] as bool? ?? false;
+        final bPurchased = b['isPurchased'] as bool? ?? false;
+
+        if (aPurchased != bPurchased) {
+          return bPurchased ? 1 : -1;
+        }
+
+        final aUpdate = a['updateAt'] as int? ?? 0;
+        final bUpdate = b['updateAt'] as int? ?? 0;
+
+        return bUpdate.compareTo(aUpdate);
+      });
+
+      final keep = items.first;
+      final keepDocId = keep['_docId'] as String;
+
+      for (final item in items.skip(1)) {
+        final docId = item['_docId'] as String;
+        if (docId == keepDocId) continue;
+
+        await collection.doc(docId).delete();
       }
-
-      final remoteId = matchingRemote['id'] as int;
-      final remoteUpdateAt = matchingRemote['updateAt'] as int? ?? 0;
-
-      final mergedIsPurchased = localItem.isPurchased || remoteIsPurchased;
-
-      final mergedUpdateAt = localItem.updateAt > remoteUpdateAt
-          ? localItem.updateAt
-          : remoteUpdateAt;
-
-      final mergedMap = {
-        ...matchingRemote,
-        'isPurchased': mergedIsPurchased,
-        'brand': localItem.brand ?? matchingRemote['brand'],
-        'model': localItem.model ?? matchingRemote['model'],
-        'link': localItem.link ?? matchingRemote['link'],
-        'plannedPrice':
-            localItem.plannedPrice ?? matchingRemote['plannedPrice'],
-        'purchasedPrice':
-            localItem.purchasedPrice ?? matchingRemote['purchasedPrice'],
-        'purchaseDate':
-            localItem.purchaseDate ?? matchingRemote['purchaseDate'],
-        'storeName': localItem.storeName ?? matchingRemote['storeName'],
-        'note': localItem.note ?? matchingRemote['note'],
-        'extraFeatures':
-            localItem.extraFeatures ?? matchingRemote['extraFeatures'],
-        'imagePath': localItem.imagePath ?? matchingRemote['imagePath'],
-        'updateAt': mergedUpdateAt,
-        'syncedAt': FieldValue.serverTimestamp(),
-      };
-
-      await collection
-          .doc(remoteId.toString())
-          .set(mergedMap, SetOptions(merge: true));
     }
   }
 
