@@ -566,6 +566,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     if (result == true && mounted) {
                       await _startSharedItemsListener();
                       await _startSharedCategoriesListener();
+
+                      ref.invalidate(activeListIdProvider);
+
+                      ref.invalidate(inviteCodeProvider);
+
+                      ref.invalidate(membersProvider);
+
+                      ref.invalidate(notificationRepositoryProvider);
+
+                      ref.invalidate(sharedNotificationsProvider);
+
                       ref.invalidate(categoriesProvider);
                     }
                   },
