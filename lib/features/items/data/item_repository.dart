@@ -340,6 +340,7 @@ class ItemRepository {
             link: const Value(null),
             updateAt: Value(DateTime.now().millisecondsSinceEpoch),
             brand: const Value(null),
+            note: const Value(null),
           ),
         );
 

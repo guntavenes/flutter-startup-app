@@ -6,7 +6,7 @@ class BrandRepository {
   Future<List<String>> getBrandsByCategory(String categoryName) async {
     final snapshot = await _firestore
         .collection('brands')
-        .where('category', isEqualTo: categoryName)
+        .where('categoryName', isEqualTo: categoryName)
         .where('active', isEqualTo: true)
         .get();
 

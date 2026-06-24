@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -197,7 +198,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       );
 
                       if (!hasAnyItem) {
-                        return _buildEmptyState();
+                        return Column(
+                          children: [
+                            _buildEmptyState(),
+                            const SizedBox(height: 90),
+                          ],
+                        );
                       }
 
                       return _buildGroupedItemList(groupedItems);
@@ -213,8 +219,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildHeader(List<Item> allItems, User? user) {
-    final isAnonymous = user?.isAnonymous ?? true;
-
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
       decoration: BoxDecoration(
@@ -1070,30 +1074,95 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget _buildEmptyState() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Color(0xFFFFD6EA)),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: const Color(0xFFFFD6EA)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFD96BA7).withValues(alpha: .08),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
-      child: const Column(
+      child: Column(
         children: [
-          Icon(Icons.inventory_2_outlined, color: Color(0xFFD96BA7), size: 34),
-          SizedBox(height: 10),
-          Text(
-            'Henüz ürün eklenmedi',
+          Container(
+            width: 84,
+            height: 84,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFFD9EB), Color(0xFFFFF1F8)],
+              ),
+            ),
+            child: const Center(
+              child: Text('🎁', style: TextStyle(fontSize: 40)),
+            ),
+          ),
+
+          const SizedBox(height: 18),
+
+          const Text(
+            'Çeyiz listen hazır değil',
             style: TextStyle(
+              fontSize: 18,
               fontWeight: FontWeight.w900,
               color: Color(0xFF2C1E26),
             ),
           ),
-          SizedBox(height: 6),
-          Text(
-            'Hazır çeyiz listesiyle başlayabilir veya + ile ürün ekleyebilirsin.',
+
+          const SizedBox(height: 8),
+
+          const Text(
+            'İlk ürününü ekleyerek çeyiz planlamana başlayabilirsin.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Color(0xFF8A6B79),
               fontWeight: FontWeight.w600,
+              height: 1.4,
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          InkWell(
+            borderRadius: BorderRadius.circular(30),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      const TemplatePreviewScreen(title: 'Hazır Çeyiz Şablonu'),
+                ),
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF0F7),
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 16,
+                    color: Color(0xFFD96BA7),
+                  ),
+                  SizedBox(width: 6),
+                  Text(
+                    'Hazır şablonları kullan',
+                    style: TextStyle(
+                      color: Color(0xFFD96BA7),
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
