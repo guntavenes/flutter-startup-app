@@ -14,6 +14,10 @@ class RecentPurchasedScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final recentItemsAsync = ref.watch(recentPurchasedItemsProvider);
+    final itemCount = recentItemsAsync.maybeWhen(
+      data: (items) => items.length,
+      orElse: () => 0,
+    );
 
     return Scaffold(
       backgroundColor: const Color(0xFFFFF5FA),
@@ -41,7 +45,7 @@ class RecentPurchasedScreen extends ConsumerWidget {
 
               return Column(
                 children: [
-                  _buildExpenseHeader(totalExpense),
+                  _buildExpenseHeader(totalExpense, itemCount),
                   const SizedBox(height: 14),
                   Expanded(
                     child: items.isEmpty
@@ -83,7 +87,7 @@ class RecentPurchasedScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildExpenseHeader(double totalExpense) {
+  Widget _buildExpenseHeader(double totalExpense, int itemCount) {
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.fromLTRB(18, 18, 18, 0),
@@ -123,21 +127,28 @@ class RecentPurchasedScreen extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'Son 7 Gün Harcama',
-                  style: TextStyle(
+                Text(
+                  'Son 7 Gün • $itemCount ürün',
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  totalExpense.toCurrency(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.w900,
-                  ),
+                TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: totalExpense),
+                  duration: const Duration(milliseconds: 900),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, value, child) {
+                    return Text(
+                      value.toCurrency(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    );
+                  },
                 ),
               ],
             ),
@@ -148,18 +159,23 @@ class RecentPurchasedScreen extends ConsumerWidget {
   }
 
   Widget _buildItemCard(Item item) {
+    final priceText = (item.purchasedPrice ?? 0).toCurrency();
+    final dateText = item.purchaseDate == null
+        ? 'Tarih yok'
+        : item.purchaseDate!.toShortDateText();
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(18),
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.92),
+        color: Colors.white.withValues(alpha: 0.95),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+        border: Border.all(color: const Color(0xFFFFD6EA)),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFD96BA7).withValues(alpha: 0.12),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
+            color: const Color(0xFFD96BA7).withValues(alpha: 0.10),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
@@ -170,13 +186,13 @@ class RecentPurchasedScreen extends ConsumerWidget {
             child: item.imagePath != null && item.imagePath!.isNotEmpty
                 ? Image.file(
                     File(item.imagePath!),
-                    width: 54,
-                    height: 54,
+                    width: 58,
+                    height: 58,
                     fit: BoxFit.cover,
                   )
                 : Container(
-                    width: 54,
-                    height: 54,
+                    width: 58,
+                    height: 58,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [Color(0xFFFFC7E3), Color(0xFFFFEEF7)],
@@ -196,19 +212,30 @@ class RecentPurchasedScreen extends ConsumerWidget {
               children: [
                 Text(
                   item.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontSize: 15,
+                    fontSize: 16,
                     fontWeight: FontWeight.w900,
                     color: Color(0xFF2C1E26),
                   ),
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 7),
                 Text(
-                  _buildSubtitle(item),
+                  priceText,
                   style: const TextStyle(
-                    fontSize: 13,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFD96BA7),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  dateText,
+                  style: const TextStyle(
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF2EAD5B),
+                    color: Color(0xFF9A7A89),
                   ),
                 ),
               ],
@@ -218,12 +245,5 @@ class RecentPurchasedScreen extends ConsumerWidget {
         ],
       ),
     );
-  }
-
-  String _buildSubtitle(Item item) {
-    final price = item.purchasedPrice ?? 0;
-    final dateText = item.purchaseDate.toShortDateText();
-
-    return '$dateText • ${price.toCurrency()}';
   }
 }
