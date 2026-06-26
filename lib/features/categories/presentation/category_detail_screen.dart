@@ -1,15 +1,15 @@
 import 'dart:io';
 
+import 'package:ceyizim_plus/core/database/app_database.dart';
+import 'package:ceyizim_plus/core/extensions/currency_extensions.dart';
+import 'package:ceyizim_plus/core/formatters/turkish_currency_input_formatter.dart';
+import 'package:ceyizim_plus/features/brands/data/brand_providers.dart';
+import 'package:ceyizim_plus/features/items/data/item_providers.dart';
+import 'package:ceyizim_plus/features/items/data/item_repository_provider.dart';
+import 'package:ceyizim_plus/features/items/presentation/item_detail_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_startup_app/core/database/app_database.dart';
-import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
-import 'package:flutter_startup_app/core/formatters/turkish_currency_input_formatter.dart';
-import 'package:flutter_startup_app/features/brands/data/brand_providers.dart';
-import 'package:flutter_startup_app/features/items/data/item_providers.dart';
-import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
-import 'package:flutter_startup_app/features/items/presentation/item_detail_screen.dart';
 
 class CategoryDetailScreen extends ConsumerStatefulWidget {
   const CategoryDetailScreen({

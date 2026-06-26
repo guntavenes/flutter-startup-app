@@ -1,7 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_startup_app/features/shared_lists/data/shared_list_providers.dart';
+import 'package:ceyizim_plus/features/shared_lists/data/shared_list_providers.dart';
 
 import '../../items/data/item_repository_provider.dart';
 import '../../items/presentation/item_detail_screen.dart';

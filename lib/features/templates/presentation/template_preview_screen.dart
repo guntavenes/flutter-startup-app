@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_startup_app/core/database/app_database.dart';
-import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
-import 'package:flutter_startup_app/features/items/data/item_providers.dart';
-import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
-import 'package:flutter_startup_app/features/templates/data/template_providers.dart';
+import 'package:ceyizim_plus/core/database/app_database.dart';
+import 'package:ceyizim_plus/features/categories/data/category_providers.dart';
+import 'package:ceyizim_plus/features/items/data/item_providers.dart';
+import 'package:ceyizim_plus/features/items/data/item_repository_provider.dart';
+import 'package:ceyizim_plus/features/templates/data/template_providers.dart';
 
 import '../domain/template_item.dart';
 

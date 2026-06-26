@@ -1,11 +1,11 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_startup_app/core/database/app_database.dart';
-import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
-import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
-import 'package:flutter_startup_app/features/items/data/item_providers.dart';
-import 'package:flutter_startup_app/features/items/presentation/item_detail_screen.dart';
+import 'package:ceyizim_plus/core/database/app_database.dart';
+import 'package:ceyizim_plus/core/extensions/currency_extensions.dart';
+import 'package:ceyizim_plus/core/extensions/date_extensions.dart';
+import 'package:ceyizim_plus/features/items/data/item_providers.dart';
+import 'package:ceyizim_plus/features/items/presentation/item_detail_screen.dart';
 
 class ItemListScreen extends StatefulWidget {
   const ItemListScreen({

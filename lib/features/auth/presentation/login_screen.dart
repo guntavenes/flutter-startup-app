@@ -1,5 +1,5 @@
+import 'package:ceyizim_plus/features/auth/data/auth_service.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_startup_app/features/auth/data/auth_service.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -15,14 +15,17 @@ class LoginScreen extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text('🎁', style: TextStyle(fontSize: 64)),
-                const SizedBox(height: 18),
+                Image.asset('assets/branding/logo.png', height: 90),
+
+                const SizedBox(height: 20),
+
                 const Text(
-                  'Çeyiz Takip',
+                  'Planla • Takip Et • Paylaş',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF2C1E26),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF8A6B79),
                   ),
                 ),
                 const SizedBox(height: 8),

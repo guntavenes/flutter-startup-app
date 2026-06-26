@@ -1,5 +1,5 @@
+import 'package:ceyizim_plus/features/shared_lists/data/shared_list_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_startup_app/features/shared_lists/data/shared_list_providers.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/database_provider.dart';

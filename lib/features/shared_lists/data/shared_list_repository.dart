@@ -2,7 +2,8 @@ import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_startup_app/features/shared_lists/models/shared_member.dart';
+import 'package:ceyizim_plus/features/shared_lists/models/shared_member.dart';
+import 'package:flutter/foundation.dart';
 
 class SharedListRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -10,9 +11,32 @@ class SharedListRepository {
   Future<String?> getActiveListId() async {
     final user = await _requireCurrentUser();
 
-    final userDoc = await _firestore.collection('users').doc(user.uid).get();
+    final userRef = _firestore.collection('users').doc(user.uid);
+    final userDoc = await userRef.get();
 
-    return userDoc.data()?['activeListId'] as String?;
+    final listId = userDoc.data()?['activeListId'] as String?;
+
+    if (listId == null || listId.isEmpty) {
+      return null;
+    }
+
+    final memberDoc = await _firestore
+        .collection('sharedLists')
+        .doc(listId)
+        .collection('members')
+        .doc(user.uid)
+        .get();
+
+    if (memberDoc.exists) {
+      return listId;
+    }
+
+    await userRef.set({
+      'activeListId': FieldValue.delete(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
+    return null;
   }
 
   Future<String> ensureActiveList() async {
@@ -30,29 +54,44 @@ class SharedListRepository {
 
     final listRef = _firestore.collection('sharedLists').doc();
     final inviteCode = _generateInviteCode();
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
 
-    await listRef.set({
+    final inviteCodeRef = _firestore.collection('inviteCodes').doc(inviteCode);
+    final memberRef = listRef.collection('members').doc(user.uid);
+    final userRef = _firestore.collection('users').doc(user.uid);
+
+    final batch = _firestore.batch();
+
+    batch.set(listRef, {
       'name': '${user.displayName ?? 'Kullanıcı'} Çeyiz Listesi',
       'ownerId': user.uid,
       'inviteCode': inviteCode,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
-      'joinedAtMs': DateTime.now().millisecondsSinceEpoch,
+      'joinedAtMs': nowMs,
     });
 
-    await listRef.collection('members').doc(user.uid).set({
+    batch.set(inviteCodeRef, {
+      'listId': listRef.id,
+      'ownerId': user.uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    batch.set(memberRef, {
       'uid': user.uid,
       'email': user.email,
       'displayName': user.displayName,
       'role': 'owner',
       'joinedAt': FieldValue.serverTimestamp(),
-      'joinedAtMs': DateTime.now().millisecondsSinceEpoch,
+      'joinedAtMs': nowMs,
     });
 
-    await _firestore.collection('users').doc(user.uid).set({
+    batch.set(userRef, {
       'activeListId': listRef.id,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    await batch.commit();
 
     return listRef.id;
   }
@@ -62,18 +101,21 @@ class SharedListRepository {
 
     final normalizedCode = inviteCode.trim().toUpperCase();
 
-    final snapshot = await _firestore
-        .collection('sharedLists')
-        .where('inviteCode', isEqualTo: normalizedCode)
-        .limit(1)
+    final inviteCodeDoc = await _firestore
+        .collection('inviteCodes')
+        .doc(normalizedCode)
         .get();
 
-    if (snapshot.docs.isEmpty) {
+    if (!inviteCodeDoc.exists) {
       throw Exception('Davet kodu bulunamadı.');
     }
 
-    final listDoc = snapshot.docs.first;
-    final listId = listDoc.id;
+    final data = inviteCodeDoc.data();
+    final listId = data?['listId'] as String?;
+
+    if (listId == null || listId.isEmpty) {
+      throw Exception('Davet kodu geçersiz.');
+    }
 
     final activeListId = await getActiveListId();
 
@@ -81,19 +123,33 @@ class SharedListRepository {
       throw Exception('Zaten bu listedesin.');
     }
 
-    await listDoc.reference.collection('members').doc(user.uid).set({
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+
+    final memberRef = _firestore
+        .collection('sharedLists')
+        .doc(listId)
+        .collection('members')
+        .doc(user.uid);
+
+    final userRef = _firestore.collection('users').doc(user.uid);
+
+    final batch = _firestore.batch();
+
+    batch.set(memberRef, {
       'uid': user.uid,
       'email': user.email,
       'displayName': user.displayName,
       'role': 'editor',
       'joinedAt': FieldValue.serverTimestamp(),
-      'joinedAtMs': DateTime.now().millisecondsSinceEpoch,
+      'joinedAtMs': nowMs,
     }, SetOptions(merge: true));
 
-    await _firestore.collection('users').doc(user.uid).set({
+    batch.set(userRef, {
       'activeListId': listId,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    await batch.commit();
 
     return listId;
   }
@@ -130,6 +186,10 @@ class SharedListRepository {
 
       final listRef = _firestore.collection('sharedLists').doc();
       final inviteCode = _generateInviteCode();
+      final inviteCodeRef = _firestore
+          .collection('inviteCodes')
+          .doc(inviteCode);
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
 
       transaction.set(listRef, {
         'name': '${user.displayName ?? 'Kullanıcı'} Çeyiz Listesi',
@@ -137,6 +197,13 @@ class SharedListRepository {
         'inviteCode': inviteCode,
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
+        'joinedAtMs': nowMs,
+      });
+
+      transaction.set(inviteCodeRef, {
+        'listId': listRef.id,
+        'ownerId': user.uid,
+        'createdAt': FieldValue.serverTimestamp(),
       });
 
       transaction.set(listRef.collection('members').doc(user.uid), {
@@ -145,6 +212,7 @@ class SharedListRepository {
         'displayName': user.displayName,
         'role': 'owner',
         'joinedAt': FieldValue.serverTimestamp(),
+        'joinedAtMs': nowMs,
       });
 
       transaction.set(userRef, {
@@ -196,10 +264,10 @@ class SharedListRepository {
   }
 
   Future<String?> getInviteCode() async {
-    final listId = await getActiveListId();
+    var listId = await getActiveListId();
 
     if (listId == null || listId.isEmpty) {
-      return null;
+      listId = await ensureActiveList();
     }
 
     final doc = await _firestore.collection('sharedLists').doc(listId).get();
@@ -261,16 +329,26 @@ class SharedListRepository {
 
   Future<String> leaveActiveSharedList() async {
     final user = await _requireCurrentUser();
-    final activeListRef = await getActiveListRef();
 
-    await activeListRef.collection('members').doc(user.uid).delete();
+    final oldListId = await getActiveListId();
+
+    if (oldListId == null || oldListId.isEmpty) {
+      return createList();
+    }
+
+    final oldMemberRef = _firestore
+        .collection('sharedLists')
+        .doc(oldListId)
+        .collection('members')
+        .doc(user.uid);
 
     final newListId = await createList();
 
-    await _firestore.collection('users').doc(user.uid).set({
-      'activeListId': newListId,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    try {
+      await oldMemberRef.delete();
+    } catch (e) {
+      debugPrint('LEAVE old member delete failed: $e');
+    }
 
     return newListId;
   }

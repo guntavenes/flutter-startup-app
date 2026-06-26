@@ -1,7 +1,7 @@
+import 'package:ceyizim_plus/core/database/app_database.dart';
+import 'package:ceyizim_plus/core/notifications/notification_planner_service.dart';
+import 'package:ceyizim_plus/core/notifications/notification_service.dart';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_startup_app/core/database/app_database.dart';
-import 'package:flutter_startup_app/core/notifications/notification_planner_service.dart';
-import 'package:flutter_startup_app/core/notifications/notification_service.dart';
 import 'package:workmanager/workmanager.dart';
 
 const String todayPlannedItemsTask = 'today_planned_items_task';

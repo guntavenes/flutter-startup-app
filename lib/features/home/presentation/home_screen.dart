@@ -1,36 +1,34 @@
 import 'dart:async';
 
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:ceyizim_plus/core/database/app_database.dart';
+import 'package:ceyizim_plus/core/database/database_provider.dart';
+import 'package:ceyizim_plus/core/extensions/currency_extensions.dart';
+import 'package:ceyizim_plus/core/extensions/date_extensions.dart';
+import 'package:ceyizim_plus/core/notifications/notification_planner_service.dart';
+import 'package:ceyizim_plus/features/auth/data/auth_providers.dart';
+import 'package:ceyizim_plus/features/auth/data/auth_service.dart';
+import 'package:ceyizim_plus/features/categories/data/category_providers.dart';
+import 'package:ceyizim_plus/features/categories/presentation/category_detail_screen.dart';
+import 'package:ceyizim_plus/features/categories/presentation/category_management_screen.dart';
+import 'package:ceyizim_plus/features/expenses/presentation/expense_detail_screen.dart';
+import 'package:ceyizim_plus/features/export/data/excel_export_service.dart';
+import 'package:ceyizim_plus/features/items/data/item_providers.dart';
+import 'package:ceyizim_plus/features/items/data/item_repository_provider.dart';
+import 'package:ceyizim_plus/features/items/domain/planned_item_filter.dart';
+import 'package:ceyizim_plus/features/items/presentation/item_form_screen.dart';
+import 'package:ceyizim_plus/features/items/presentation/item_list_screen.dart';
+import 'package:ceyizim_plus/features/items/presentation/planned_items_screen.dart';
+import 'package:ceyizim_plus/features/items/presentation/recent_purchased_screen.dart';
+import 'package:ceyizim_plus/features/notifications/data/notification_providers.dart';
+import 'package:ceyizim_plus/features/notifications/models/shared_notification.dart';
+import 'package:ceyizim_plus/features/notifications/presentation/shared_notifications_screen.dart';
+import 'package:ceyizim_plus/features/shared_lists/data/shared_list_providers.dart';
+import 'package:ceyizim_plus/features/shared_lists/models/shared_member.dart';
+import 'package:ceyizim_plus/features/shared_lists/presentation/share_list_bottom_sheet.dart';
+import 'package:ceyizim_plus/features/templates/presentation/template_preview_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_startup_app/core/database/app_database.dart';
-import 'package:flutter_startup_app/core/database/database_provider.dart';
-import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
-import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
-import 'package:flutter_startup_app/core/notifications/notification_planner_service.dart';
-import 'package:flutter_startup_app/features/auth/data/auth_providers.dart';
-import 'package:flutter_startup_app/features/auth/data/auth_service.dart';
-import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
-import 'package:flutter_startup_app/features/categories/presentation/category_detail_screen.dart';
-import 'package:flutter_startup_app/features/expenses/presentation/expense_detail_screen.dart';
-import 'package:flutter_startup_app/features/export/data/excel_export_service.dart';
-import 'package:flutter_startup_app/features/items/data/item_providers.dart';
-import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart'
-    hide sharedItemsSyncProvider;
-import 'package:flutter_startup_app/features/items/domain/planned_item_filter.dart';
-import 'package:flutter_startup_app/features/items/presentation/item_form_screen.dart';
-import 'package:flutter_startup_app/features/items/presentation/item_list_screen.dart';
-import 'package:flutter_startup_app/features/items/presentation/planned_items_screen.dart';
-import 'package:flutter_startup_app/features/items/presentation/recent_purchased_screen.dart';
-import 'package:flutter_startup_app/features/notifications/data/notification_providers.dart';
-import 'package:flutter_startup_app/features/notifications/models/shared_notification.dart';
-import 'package:flutter_startup_app/features/notifications/presentation/shared_notifications_screen.dart';
-import 'package:flutter_startup_app/features/shared_lists/models/shared_member.dart';
-import 'package:flutter_startup_app/features/shared_lists/presentation/share_list_bottom_sheet.dart';
-import 'package:flutter_startup_app/features/templates/presentation/template_preview_screen.dart';
-import 'package:flutter_startup_app/features/categories/presentation/category_management_screen.dart';
-import 'package:flutter_startup_app/features/shared_lists/data/shared_list_providers.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -155,9 +153,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   allItemsAsync.when(
-                    loading: () => _buildHeader([], currentUser),
-                    error: (_, _) => _buildHeader([], currentUser),
-                    data: (allItems) => _buildHeader(allItems, currentUser),
+                    loading: () => _buildTopBar([]),
+                    error: (_, _) => _buildTopBar([]),
+                    data: (allItems) => _buildTopBar(allItems),
                   ),
                   const SizedBox(height: 14),
                   allItemsAsync.when(
@@ -218,57 +216,61 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildHeader(List<Item> allItems, User? user) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.78),
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
-      ),
-      child: Row(
+  Widget _buildTopBar(List<Item> allItems) {
+    return SizedBox(
+      height: 56,
+      child: Stack(
+        alignment: Alignment.center,
         children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFFFFC7E3), Color(0xFFFFEEF7)],
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                clipBehavior: Clip.antiAlias,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Image.asset(
+                  'assets/branding/app_icon.png',
+                  fit: BoxFit.cover,
+                ),
               ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: const Center(
-              child: Text('🎁', style: TextStyle(fontSize: 24)),
-            ),
-          ),
-          const SizedBox(width: 12),
-          const Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Çeyiz Özeti',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                    color: Color(0xFF2C1E26),
-                  ),
+              const SizedBox(width: 10),
+              const Text(
+                'Çeyizim',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF8E244E),
                 ),
-                SizedBox(height: 3),
-                Text(
-                  'Listen, harcamaların ve planların',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF8A6B79),
-                  ),
+              ),
+              const Text(
+                '+',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFFFF5B9A),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.more_vert_rounded, color: Color(0xFF6D4C5B)),
-            onPressed: () => _showHomeMenu(allItems),
+
+          Positioned(
+            right: 0,
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF0F7),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.more_vert_rounded),
+                onPressed: () => _showHomeMenu(allItems),
+              ),
+            ),
           ),
         ],
       ),

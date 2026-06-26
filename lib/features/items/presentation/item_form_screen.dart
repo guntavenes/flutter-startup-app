@@ -3,14 +3,14 @@ import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_startup_app/core/database/app_database.dart';
-import 'package:flutter_startup_app/core/formatters/turkish_currency_input_formatter.dart';
-import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
-import 'package:flutter_startup_app/features/items/data/item_providers.dart';
-import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
+import 'package:ceyizim_plus/core/database/app_database.dart';
+import 'package:ceyizim_plus/core/formatters/turkish_currency_input_formatter.dart';
+import 'package:ceyizim_plus/features/categories/data/category_providers.dart';
+import 'package:ceyizim_plus/features/items/data/item_providers.dart';
+import 'package:ceyizim_plus/features/items/data/item_repository_provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:flutter_startup_app/core/formatters/title_case_text_formatter.dart';
-import 'package:flutter_startup_app/features/brands/data/brand_providers.dart';
+import 'package:ceyizim_plus/core/formatters/title_case_text_formatter.dart';
+import 'package:ceyizim_plus/features/brands/data/brand_providers.dart';
 
 class ItemFormScreen extends ConsumerStatefulWidget {
   const ItemFormScreen({super.key, this.item});

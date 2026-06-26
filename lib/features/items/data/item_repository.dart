@@ -1,11 +1,10 @@
 import 'dart:async';
 
+import 'package:ceyizim_plus/features/notifications/data/notification_repository.dart';
+import 'package:ceyizim_plus/features/shared_lists/data/shared_list_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_startup_app/features/notifications/data/notification_repository.dart';
-import 'package:flutter_startup_app/features/shared_lists/data/shared_list_repository.dart';
 
 import '../../../core/database/app_database.dart';
 
@@ -137,31 +136,6 @@ class ItemRepository {
         await collection.doc(docId).delete();
       }
     }
-  }
-
-  String _generateUniqueItemName({
-    required String baseName,
-    required int categoryId,
-    required List<Map<String, dynamic>> remoteItems,
-  }) {
-    final normalizedBaseName = baseName.trim().toLowerCase();
-
-    final existingNames = remoteItems
-        .where((item) => item['categoryId'] == categoryId)
-        .map((item) => (item['name'] as String).trim().toLowerCase())
-        .toSet();
-
-    if (!existingNames.contains(normalizedBaseName)) {
-      return baseName;
-    }
-
-    var counter = 2;
-
-    while (existingNames.contains('$normalizedBaseName $counter')) {
-      counter++;
-    }
-
-    return '$baseName $counter';
   }
 
   Stream<void> watchSharedListItems() async* {

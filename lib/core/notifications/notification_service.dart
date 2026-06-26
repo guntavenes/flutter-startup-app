@@ -1,7 +1,7 @@
 import 'dart:io';
 
+import 'package:ceyizim_plus/main.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:flutter_startup_app/main.dart';
 
 class NotificationService {
   NotificationService._();
@@ -50,11 +50,7 @@ class NotificationService {
           .resolvePlatformSpecificImplementation<
             IOSFlutterLocalNotificationsPlugin
           >()
-          ?.requestPermissions(
-            alert: true,
-            badge: true,
-            sound: true,
-          );
+          ?.requestPermissions(alert: true, badge: true, sound: true);
     }
   }
 
@@ -62,9 +58,7 @@ class NotificationService {
     required int itemCount,
   }) async {
     final details = Platform.isIOS
-        ? const NotificationDetails(
-            iOS: DarwinNotificationDetails(),
-          )
+        ? const NotificationDetails(iOS: DarwinNotificationDetails())
         : const NotificationDetails(
             android: AndroidNotificationDetails(
               'today_planned_items_channel',

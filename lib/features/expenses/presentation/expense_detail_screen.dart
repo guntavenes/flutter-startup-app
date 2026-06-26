@@ -1,13 +1,13 @@
 import 'dart:io';
 
+import 'package:ceyizim_plus/core/database/app_database.dart';
+import 'package:ceyizim_plus/core/extensions/currency_extensions.dart';
+import 'package:ceyizim_plus/core/extensions/date_extensions.dart';
+import 'package:ceyizim_plus/features/categories/data/category_providers.dart';
+import 'package:ceyizim_plus/features/expenses/domain/expense_sort_type.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_startup_app/core/database/app_database.dart';
-import 'package:flutter_startup_app/core/extensions/currency_extensions.dart';
-import 'package:flutter_startup_app/core/extensions/date_extensions.dart';
-import 'package:flutter_startup_app/features/categories/data/category_providers.dart';
-import 'package:flutter_startup_app/features/expenses/domain/expense_sort_type.dart';
 
 class ExpenseDetailScreen extends ConsumerStatefulWidget {
   const ExpenseDetailScreen({super.key, required this.items});

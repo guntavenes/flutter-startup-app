@@ -1,7 +1,7 @@
+import 'package:ceyizim_plus/features/items/data/item_providers.dart';
+import 'package:ceyizim_plus/features/notifications/data/notification_providers.dart';
+import 'package:ceyizim_plus/features/shared_lists/data/shared_list_providers.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_startup_app/features/items/data/item_providers.dart';
-import 'package:flutter_startup_app/features/notifications/data/notification_providers.dart';
-import 'package:flutter_startup_app/features/shared_lists/data/shared_list_providers.dart';
 
 import '../../../core/database/database_provider.dart';
 import 'item_repository.dart';

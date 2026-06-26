@@ -1,9 +1,10 @@
+import 'package:ceyizim_plus/features/items/data/item_providers.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_startup_app/features/items/data/item_repository_provider.dart';
-import 'package:flutter_startup_app/features/notifications/data/notification_providers.dart';
+import 'package:ceyizim_plus/features/items/data/item_repository_provider.dart';
+import 'package:ceyizim_plus/features/notifications/data/notification_providers.dart';
 
 import '../../categories/data/category_providers.dart';
 import '../data/shared_list_providers.dart';
@@ -221,6 +222,8 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
       ref.invalidate(inviteCodeProvider);
       ref.invalidate(membersProvider);
       ref.invalidate(categoriesProvider);
+      ref.invalidate(allItemsProvider);
+      ref.invalidate(groupedItemsProvider);
       ref.invalidate(notificationRepositoryProvider);
       ref.invalidate(sharedNotificationsProvider);
 

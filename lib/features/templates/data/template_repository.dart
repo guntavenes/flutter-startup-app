@@ -1,5 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter_startup_app/features/templates/domain/template_item.dart';
+import 'package:ceyizim_plus/features/templates/domain/template_item.dart';
 
 class TemplateRepository {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
