@@ -4,6 +4,7 @@ import 'package:ceyizim_plus/features/notifications/data/notification_repository
 import 'package:ceyizim_plus/features/shared_lists/data/shared_list_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/database/app_database.dart';
@@ -37,6 +38,8 @@ class ItemRepository {
     )..where((tbl) => tbl.id.equals(insertedId))).getSingle();
 
     await _setItemToFirestore(insertedItem);
+
+    await FirebaseAnalytics.instance.logEvent(name: 'Add Item');
 
     return insertedId;
   }

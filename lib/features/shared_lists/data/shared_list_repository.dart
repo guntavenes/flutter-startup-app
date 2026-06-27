@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:ceyizim_plus/features/shared_lists/models/shared_member.dart';
 import 'package:flutter/foundation.dart';
@@ -93,6 +94,8 @@ class SharedListRepository {
 
     await batch.commit();
 
+    await FirebaseAnalytics.instance.logEvent(name: 'create_list');
+
     return listRef.id;
   }
 
@@ -150,6 +153,10 @@ class SharedListRepository {
     }, SetOptions(merge: true));
 
     await batch.commit();
+
+    await FirebaseAnalytics.instance.logEvent(
+      name: 'join_list_with_invite_code',
+    );
 
     return listId;
   }
@@ -349,6 +356,8 @@ class SharedListRepository {
     } catch (e) {
       debugPrint('LEAVE old member delete failed: $e');
     }
+
+    await FirebaseAnalytics.instance.logEvent(name: 'leaveActiveSharedList');
 
     return newListId;
   }
