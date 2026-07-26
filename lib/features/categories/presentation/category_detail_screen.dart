@@ -605,6 +605,7 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
                     onTap: () async {
                       final pickedDate = await showDatePicker(
                         context: dialogContext,
+                        locale: const Locale('tr', 'TR'),
                         initialDate: selectedDate,
                         firstDate: DateTime(2020),
                         lastDate: DateTime.now(),

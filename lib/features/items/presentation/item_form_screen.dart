@@ -1,16 +1,17 @@
 import 'dart:io';
+
+import 'package:ceyizim_plus/core/database/app_database.dart';
+import 'package:ceyizim_plus/core/formatters/title_case_text_formatter.dart';
+import 'package:ceyizim_plus/core/formatters/turkish_currency_input_formatter.dart';
+import 'package:ceyizim_plus/features/brands/data/brand_providers.dart';
+import 'package:ceyizim_plus/features/categories/data/category_providers.dart';
+import 'package:ceyizim_plus/features/items/data/item_providers.dart';
+import 'package:ceyizim_plus/features/items/data/item_repository_provider.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:ceyizim_plus/core/database/app_database.dart';
-import 'package:ceyizim_plus/core/formatters/turkish_currency_input_formatter.dart';
-import 'package:ceyizim_plus/features/categories/data/category_providers.dart';
-import 'package:ceyizim_plus/features/items/data/item_providers.dart';
-import 'package:ceyizim_plus/features/items/data/item_repository_provider.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:ceyizim_plus/core/formatters/title_case_text_formatter.dart';
-import 'package:ceyizim_plus/features/brands/data/brand_providers.dart';
 
 class ItemFormScreen extends ConsumerStatefulWidget {
   const ItemFormScreen({super.key, this.item});
@@ -238,6 +239,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
   Future<DateTime?> _pickDate(DateTime? initialDate) {
     return showDatePicker(
       context: context,
+      locale: const Locale('tr', 'TR'),
       initialDate: initialDate ?? DateTime.now(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
@@ -404,6 +406,7 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                     label: 'Not',
                     icon: Icons.notes_outlined,
                     maxLines: 3,
+                    inputFormatters: [TitleCaseTextFormatter()],
                   ),
                   if (!_isEditMode) ...[
                     const SizedBox(height: 24),
@@ -1372,19 +1375,6 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
           ),
         ),
       ),
-    );
-  }
-
-  String _formatPriceForController(double? price) {
-    if (price == null) {
-      return '';
-    }
-
-    final value = price.truncate();
-
-    return value.toString().replaceAllMapped(
-      RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
-      (match) => '${match[1]}.',
     );
   }
 }
