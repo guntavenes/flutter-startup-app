@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:ceyizim_plus/core/database/app_database.dart';
 import 'package:ceyizim_plus/core/extensions/currency_extensions.dart';
 import 'package:ceyizim_plus/core/formatters/turkish_currency_input_formatter.dart';
+import 'package:ceyizim_plus/core/safe_local_image.dart';
 import 'package:ceyizim_plus/features/brands/data/brand_providers.dart';
 import 'package:ceyizim_plus/features/items/data/item_providers.dart';
 import 'package:ceyizim_plus/features/items/data/item_repository_provider.dart';
@@ -354,28 +355,25 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(16),
-            child: item.imagePath != null && item.imagePath!.isNotEmpty
-                ? Image.file(
-                    File(item.imagePath!),
-                    width: 44,
-                    height: 44,
-                    fit: BoxFit.cover,
-                  )
-                : Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFFC7E3), Color(0xFFFFEEF7)],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.shopping_bag_outlined,
-                      color: Color(0xFFD96BA7),
-                      size: 22,
-                    ),
-                  ),
+            child: SafeLocalImage(
+              imagePath: item.imagePath,
+              width: 44,
+              height: 44,
+              fit: BoxFit.cover,
+              cacheWidth: 160,
+              cacheHeight: 160,
+              fallback: Container(
+                width: 44,
+                height: 44,
+                alignment: Alignment.center,
+                color: const Color(0xFFFFEEF7),
+                child: const Icon(
+                  Icons.inventory_2_outlined,
+                  size: 22,
+                  color: Color(0xFFD88AAF),
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(

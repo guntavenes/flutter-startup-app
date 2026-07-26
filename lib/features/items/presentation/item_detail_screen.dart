@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:ceyizim_plus/core/database/app_database.dart';
 import 'package:ceyizim_plus/core/extensions/currency_extensions.dart';
 import 'package:ceyizim_plus/core/extensions/date_extensions.dart';
+import 'package:ceyizim_plus/core/safe_local_image.dart';
 import 'package:ceyizim_plus/features/items/presentation/item_form_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -170,10 +171,11 @@ class ItemDetailScreen extends StatelessWidget {
             height: 220,
             width: double.infinity,
             color: const Color(0xFFFFEEF7),
-            child: Image.file(
-              File(item.imagePath!),
+            child: SafeLocalImage(
+              imagePath: item.imagePath,
               fit: BoxFit.contain,
               cacheWidth: 1200,
+              fallback: const SizedBox.shrink(),
             ),
           ),
         ),
@@ -378,7 +380,13 @@ class ItemDetailScreen extends StatelessWidget {
   }
 
   void _showFullImage(BuildContext context) {
-    if (item.imagePath == null || item.imagePath!.isEmpty) return;
+    if (item.imagePath == null || item.imagePath!.isEmpty) {
+      return;
+    }
+
+    if (!File(item.imagePath!).existsSync()) {
+      return;
+    }
 
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -390,7 +398,11 @@ class ItemDetailScreen extends StatelessWidget {
           ),
           body: Center(
             child: InteractiveViewer(
-              child: Image.file(File(item.imagePath!), fit: BoxFit.contain),
+              child: SafeLocalImage(
+                imagePath: item.imagePath,
+                fit: BoxFit.contain,
+                fallback: const SizedBox.shrink(),
+              ),
             ),
           ),
         ),

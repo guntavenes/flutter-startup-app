@@ -93,8 +93,3 @@ final groupedItemsProvider = Provider<AsyncValue<Map<Category, List<Item>>>>((
     },
   );
 });
-
-final sharedItemsSyncProvider = StreamProvider<void>((ref) {
-  final repository = ref.watch(itemRepositoryProvider);
-  return repository.watchSharedListItems();
-});

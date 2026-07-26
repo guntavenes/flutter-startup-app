@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:ceyizim_plus/core/database/app_database.dart';
 import 'package:ceyizim_plus/core/formatters/title_case_text_formatter.dart';
 import 'package:ceyizim_plus/core/formatters/turkish_currency_input_formatter.dart';
+import 'package:ceyizim_plus/core/safe_local_image.dart';
 import 'package:ceyizim_plus/features/brands/data/brand_providers.dart';
 import 'package:ceyizim_plus/features/categories/data/category_providers.dart';
 import 'package:ceyizim_plus/features/items/data/item_providers.dart';
@@ -1337,13 +1338,14 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                   : Stack(
                       children: [
                         Positioned.fill(
-                          child: Image.file(
-                            File(_selectedImagePath!),
+                          child: SafeLocalImage(
+                            imagePath: _selectedImagePath,
                             width: double.infinity,
                             height: double.infinity,
                             fit: BoxFit.cover,
                             cacheWidth: 800,
                             cacheHeight: 500,
+                            fallback: const SizedBox.shrink(),
                           ),
                         ),
                         Positioned(
