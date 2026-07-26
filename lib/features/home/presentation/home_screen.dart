@@ -54,29 +54,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   void initState() {
     super.initState();
 
-    Future.microtask(_startSharedItemsListener);
-    Future.microtask(_startSharedCategoriesListener);
-
-    Future.microtask(() async {
-      try {
-        final user = FirebaseAuth.instance.currentUser;
-
-        if (user == null) {
-          return;
-        }
-
-        final categoryRepository = ref.read(categoryRepositoryProvider);
-
-        await categoryRepository.insertDefaultCategories();
-        await categoryRepository.syncCategoriesFromFirestore();
-
-        final itemRepository = ref.read(itemRepositoryProvider);
-        await itemRepository.syncItemsFromFirestore();
-      } catch (error, stackTrace) {
-        debugPrint('HOME_INIT_ERROR: $error');
-        debugPrintStack(stackTrace: stackTrace);
-      }
-    });
+    Future.microtask(_initializeSharedData);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
@@ -86,6 +64,24 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         debugPrintStack(stackTrace: stackTrace);
       }
     });
+  }
+
+  Future<void> _initializeSharedData() async {
+    try {
+      await FirebaseAuth.instance.authStateChanges().firstWhere(
+        (user) => user != null,
+      );
+
+      final categoryRepository = ref.read(categoryRepositoryProvider);
+
+      await categoryRepository.insertDefaultCategories();
+
+      await _startSharedCategoriesListener();
+      await _startSharedItemsListener();
+    } catch (error, stackTrace) {
+      debugPrint('HOME_INIT_ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
   }
 
   Future<void> _startSharedItemsListener() async {
@@ -99,15 +95,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
       await repository.syncItemsFromFirestore();
 
-      _sharedItemsSubscription = repository.watchSharedListItems().listen(
+      final subscription = repository.watchSharedListItems().listen(
         (_) {},
-        onError: (error, stackTrace) async {
+        onError: (error, stackTrace) {
           debugPrint('SHARED_ITEMS_LISTENER_ERROR: $error');
-
-          await _sharedItemsSubscription?.cancel();
-          _sharedItemsSubscription = null;
+          debugPrintStack(stackTrace: stackTrace);
         },
       );
+
+      _sharedItemsSubscription = subscription;
     } catch (error, stackTrace) {
       debugPrint('START_SHARED_ITEMS_LISTENER_ERROR: $error');
       debugPrintStack(stackTrace: stackTrace);

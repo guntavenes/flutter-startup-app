@@ -170,7 +170,7 @@ class CategoryRepository {
         final data = doc.data();
 
         final isDeleted = data['isDeleted'] as bool? ?? false;
-        final id = data['id'] as int;
+        final id = (data['id'] as num).toInt();
 
         if (isDeleted) {
           await (_db.delete(

@@ -146,47 +146,57 @@ class ItemRepository {
 
     yield* collection.snapshots().asyncMap((snapshot) async {
       for (final doc in snapshot.docs) {
-        final data = doc.data();
+        try {
+          final data = doc.data();
 
-        final isDeleted = data['isDeleted'] as bool? ?? false;
+          final id = (data['id'] as num?)?.toInt();
+          if (id == null) {
+            debugPrint('SHARED_ITEM_SYNC: id bulunamadı (${doc.id})');
+            continue;
+          }
 
-        final id = data['id'] as int;
+          final isDeleted = data['isDeleted'] as bool? ?? false;
 
-        if (isDeleted) {
-          await (_database.delete(
-            _database.items,
-          )..where((tbl) => tbl.id.equals(id))).go();
+          if (isDeleted) {
+            await (_database.delete(
+              _database.items,
+            )..where((tbl) => tbl.id.equals(id))).go();
+            continue;
+          }
 
-          continue;
+          await _database
+              .into(_database.items)
+              .insertOnConflictUpdate(
+                ItemsCompanion(
+                  id: Value(id),
+                  categoryId: Value((data['categoryId'] as num).toInt()),
+                  name: Value(data['name'] as String),
+                  brand: Value(data['brand'] as String?),
+                  model: Value(data['model'] as String?),
+                  link: Value(data['link'] as String?),
+                  plannedPrice: Value(
+                    (data['plannedPrice'] as num?)?.toDouble(),
+                  ),
+                  purchasedPrice: Value(
+                    (data['purchasedPrice'] as num?)?.toDouble(),
+                  ),
+                  purchaseDate: Value((data['purchaseDate'] as num?)?.toInt()),
+                  storeName: Value(data['storeName'] as String?),
+                  note: Value(data['note'] as String?),
+                  extraFeatures: Value(data['extraFeatures'] as String?),
+                  imagePath: Value(data['imagePath'] as String?),
+                  isPurchased: Value(data['isPurchased'] as bool? ?? false),
+                  createdAt: Value((data['createdAt'] as num).toInt()),
+                  updateAt: Value((data['updateAt'] as num).toInt()),
+                  estimatedPurchaseDate: Value(
+                    (data['estimatedPurchaseDate'] as num?)?.toInt(),
+                  ),
+                ),
+              );
+        } catch (e, stackTrace) {
+          debugPrint('SHARED_ITEM_SYNC_ERROR (${doc.id}): $e');
+          debugPrintStack(stackTrace: stackTrace);
         }
-
-        await _database
-            .into(_database.items)
-            .insertOnConflictUpdate(
-              ItemsCompanion(
-                id: Value(id),
-                categoryId: Value(data['categoryId'] as int),
-                name: Value(data['name'] as String),
-                brand: Value(data['brand'] as String?),
-                model: Value(data['model'] as String?),
-                link: Value(data['link'] as String?),
-                plannedPrice: Value((data['plannedPrice'] as num?)?.toDouble()),
-                purchasedPrice: Value(
-                  (data['purchasedPrice'] as num?)?.toDouble(),
-                ),
-                purchaseDate: Value(data['purchaseDate'] as int?),
-                storeName: Value(data['storeName'] as String?),
-                note: Value(data['note'] as String?),
-                extraFeatures: Value(data['extraFeatures'] as String?),
-                imagePath: Value(data['imagePath'] as String?),
-                isPurchased: Value(data['isPurchased'] as bool? ?? false),
-                createdAt: Value(data['createdAt'] as int),
-                updateAt: Value(data['updateAt'] as int),
-                estimatedPurchaseDate: Value(
-                  data['estimatedPurchaseDate'] as int?,
-                ),
-              ),
-            );
       }
     });
   }
@@ -234,6 +244,7 @@ class ItemRepository {
 
   Future<int> togglePurchased(Item item) async {
     final newIsPurchased = !item.isPurchased;
+    final now = DateTime.now().millisecondsSinceEpoch;
 
     final result =
         await (_database.update(
@@ -241,7 +252,7 @@ class ItemRepository {
         )..where((tbl) => tbl.id.equals(item.id))).write(
           ItemsCompanion(
             isPurchased: Value(newIsPurchased),
-            updateAt: Value(DateTime.now().millisecondsSinceEpoch),
+            updateAt: Value(now),
           ),
         );
 
@@ -249,17 +260,18 @@ class ItemRepository {
       _database.items,
     )..where((tbl) => tbl.id.equals(item.id))).getSingle();
 
-    await _setItemToFirestore(updatedItem);
+    try {
+      await _setItemToFirestore(updatedItem);
 
-    if (newIsPurchased) {
-      try {
+      if (newIsPurchased) {
         await _notificationRepository.addItemPurchasedNotification(
           itemId: updatedItem.id,
           itemName: updatedItem.name,
         );
-      } catch (error) {
-        debugPrint('ADD_NOTIFICATION_ERROR: $error');
       }
+    } catch (error, stackTrace) {
+      debugPrint('TOGGLE_PURCHASED_SYNC_ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
     }
 
     return result;
@@ -408,7 +420,7 @@ class ItemRepository {
 
     for (final doc in snapshot.docs) {
       final data = doc.data();
-      final id = data['id'] as int;
+      final id = (data['id'] as num).toInt();
 
       await _database
           .into(_database.items)
