@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:ceyizim_plus/core/database/app_database.dart';
 import 'package:ceyizim_plus/core/formatters/title_case_text_formatter.dart';
 import 'package:ceyizim_plus/core/formatters/turkish_currency_input_formatter.dart';
@@ -1212,22 +1210,59 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    final picker = ImagePicker();
+    try {
+      final picker = ImagePicker();
 
-    final pickedFile = await picker.pickImage(
-      source: source,
-      imageQuality: 70,
-      maxWidth: 1000,
-      maxHeight: 1000,
-    );
+      final pickedFile = await picker.pickImage(
+        source: source,
+        imageQuality: 70,
+        maxWidth: 1000,
+        maxHeight: 1000,
+      );
 
-    if (pickedFile == null) {
-      return;
+      if (!mounted || pickedFile == null) {
+        return;
+      }
+
+      setState(() {
+        _selectedImagePath = pickedFile.path;
+      });
+    } on PlatformException catch (error, stackTrace) {
+      debugPrint('IMAGE_PICKER_PLATFORM_ERROR: ${error.code}');
+      debugPrint('IMAGE_PICKER_MESSAGE: ${error.message}');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      final message = switch (error.code) {
+        'camera_access_denied' || 'camera_access_restricted' =>
+          'Kamera erişimi kapalı. Ayarlar bölümünden kamera iznini açabilirsiniz.',
+        'photo_access_denied' || 'photo_access_restricted' =>
+          'Fotoğraf erişimi kapalı. Ayarlar bölümünden fotoğraf iznini açabilirsiniz.',
+        'camera_unavailable' => 'Kamera bu cihazda kullanılamıyor.',
+        _ =>
+          source == ImageSource.camera
+              ? 'Kamera açılamadı. Lütfen tekrar deneyin.'
+              : 'Fotoğraf seçilemedi. Lütfen tekrar deneyin.',
+      };
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (error, stackTrace) {
+      debugPrint('IMAGE_PICKER_ERROR: $error');
+      debugPrintStack(stackTrace: stackTrace);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Fotoğraf işlemi tamamlanamadı. Lütfen tekrar deneyin.',
+          ),
+        ),
+      );
     }
-
-    setState(() {
-      _selectedImagePath = pickedFile.path;
-    });
   }
 
   Future<void> _showImageSourceSheet() async {
@@ -1262,9 +1297,9 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                     'Galeriden seç',
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.of(sheetContext).pop();
-                    _pickImage(ImageSource.gallery);
+                    await _pickImage(ImageSource.gallery);
                   },
                 ),
                 ListTile(
@@ -1276,9 +1311,9 @@ class _ItemFormScreenState extends ConsumerState<ItemFormScreen> {
                     'Kamera ile çek',
                     style: TextStyle(fontWeight: FontWeight.w800),
                   ),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.of(sheetContext).pop();
-                    _pickImage(ImageSource.camera);
+                    await _pickImage(ImageSource.camera);
                   },
                 ),
               ],

@@ -81,5 +81,12 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+
+	<key>NSCameraUsageDescription</key>
+	<string>Çeyiz ürünlerine fotoğraf ekleyebilmeniz için kamera erişimi gereklidir.</string>
+
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Çeyiz ürünlerine fotoğraf ekleyebilmeniz için fotoğraf arşivinize erişim gereklidir.</string>
+
 </dict>
 </plist>
