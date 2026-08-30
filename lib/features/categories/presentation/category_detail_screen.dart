@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:ceyizim_plus/core/database/app_database.dart';
 import 'package:ceyizim_plus/core/extensions/currency_extensions.dart';
 import 'package:ceyizim_plus/core/formatters/turkish_currency_input_formatter.dart';
@@ -522,6 +520,8 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
     final brandOptions = await ref.read(
       brandsByCategoryProvider(widget.category.name).future,
     );
+
+    if (!mounted) return null;
 
     String? selectedBrand = brandOptions.contains(item.brand)
         ? item.brand

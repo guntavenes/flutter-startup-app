@@ -143,6 +143,7 @@ class SharedListRepository {
       'email': user.email,
       'displayName': user.displayName,
       'role': 'editor',
+      'inviteCode': normalizedCode,
       'joinedAt': FieldValue.serverTimestamp(),
       'joinedAtMs': nowMs,
     }, SetOptions(merge: true));
@@ -238,27 +239,41 @@ class SharedListRepository {
   Future<String> createListForUser(User user) async {
     final listRef = _firestore.collection('sharedLists').doc();
     final inviteCode = _generateInviteCode();
+    final inviteCodeRef = _firestore.collection('inviteCodes').doc(inviteCode);
+    final userRef = _firestore.collection('users').doc(user.uid);
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final batch = _firestore.batch();
 
-    await listRef.set({
+    batch.set(listRef, {
       'name': '${user.displayName ?? 'Kullanıcı'} Çeyiz Listesi',
       'ownerId': user.uid,
       'inviteCode': inviteCode,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
+      'joinedAtMs': nowMs,
     });
 
-    await listRef.collection('members').doc(user.uid).set({
+    batch.set(inviteCodeRef, {
+      'listId': listRef.id,
+      'ownerId': user.uid,
+      'createdAt': FieldValue.serverTimestamp(),
+    });
+
+    batch.set(listRef.collection('members').doc(user.uid), {
       'uid': user.uid,
       'email': user.email,
       'displayName': user.displayName,
       'role': 'owner',
       'joinedAt': FieldValue.serverTimestamp(),
+      'joinedAtMs': nowMs,
     });
 
-    await _firestore.collection('users').doc(user.uid).set({
+    batch.set(userRef, {
       'activeListId': listRef.id,
       'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+
+    await batch.commit();
 
     return listRef.id;
   }

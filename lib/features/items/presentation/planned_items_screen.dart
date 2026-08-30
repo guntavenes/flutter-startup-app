@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:ceyizim_plus/core/database/app_database.dart';
 import 'package:ceyizim_plus/core/extensions/date_extensions.dart';
 import 'package:ceyizim_plus/core/safe_local_image.dart';

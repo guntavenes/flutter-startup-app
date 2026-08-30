@@ -1,0 +1,133 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function memberPath(listId, userId) {
+      return /databases/$(database)/documents/sharedLists/$(listId)/members/$(userId);
+    }
+
+    function listPath(listId) {
+      return /databases/$(database)/documents/sharedLists/$(listId);
+    }
+
+    function invitePath(code) {
+      return /databases/$(database)/documents/inviteCodes/$(code);
+    }
+
+    function isSharedListMember(listId) {
+      return isSignedIn() && exists(memberPath(listId, request.auth.uid));
+    }
+
+    function isSharedListOwner(listId) {
+      return isSignedIn()
+        && get(listPath(listId)).data.ownerId == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId;
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'displayName',
+          'email',
+          'isAnonymous',
+          'activeListId',
+          'updatedAt'
+        ]);
+      allow delete: if false;
+    }
+
+    match /sharedLists/{listId} {
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.inviteCode is string;
+      allow read: if isSharedListMember(listId) || isSharedListOwner(listId);
+      allow update: if isSharedListOwner(listId)
+        && request.resource.data.ownerId == resource.data.ownerId
+        && request.resource.data.inviteCode == resource.data.inviteCode
+        && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if isSharedListOwner(listId);
+
+      match /members/{memberId} {
+        allow read: if isSharedListMember(listId) || isSharedListOwner(listId);
+
+        allow create: if isSignedIn()
+          && request.auth.uid == memberId
+          && request.resource.data.uid == memberId
+          && (
+            (
+              request.resource.data.role == 'owner'
+              && getAfter(listPath(listId)).data.ownerId == memberId
+            )
+            ||
+            (
+              request.resource.data.role == 'editor'
+              && request.resource.data.inviteCode is string
+              && get(invitePath(request.resource.data.inviteCode)).data.listId == listId
+            )
+          );
+
+        allow update: if isSignedIn()
+          && request.auth.uid == memberId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'displayName',
+            'email',
+            'updatedAt'
+          ]);
+
+        allow delete: if isSignedIn()
+          && (request.auth.uid == memberId || isSharedListOwner(listId));
+      }
+
+      match /items/{itemId} {
+        allow read, write: if isSharedListMember(listId);
+      }
+
+      match /categories/{categoryId} {
+        allow read, write: if isSharedListMember(listId);
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isSharedListMember(listId);
+        allow create: if isSharedListMember(listId)
+          && request.resource.data.createdBy == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
+    match /inviteCodes/{code} {
+      allow get: if isSignedIn();
+      allow list: if false;
+      allow create: if isSignedIn()
+        && request.resource.data.listId is string
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.createdAt == request.time
+        && getAfter(listPath(request.resource.data.listId)).data.ownerId == request.auth.uid
+        && getAfter(listPath(request.resource.data.listId)).data.inviteCode == code;
+      allow update, delete: if false;
+    }
+
+    match /templates/{templateId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /items/{itemId} {
+        allow read: if true;
+        allow write: if false;
+      }
+    }
+
+    match /brands/{brandId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

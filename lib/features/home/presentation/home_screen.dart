@@ -118,8 +118,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authStateProvider);
-    final currentUser = authState.value;
+    ref.watch(authStateProvider);
     final allItemsAsync = ref.watch(allItemsProvider);
     final groupedItemsAsync = ref.watch(groupedItemsProvider);
 
@@ -1686,27 +1685,5 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
       ),
     );
-  }
-
-  List<Item> _getUpcomingItems(List<Item> items) {
-    final now = DateTime.now();
-
-    return items.where((item) {
-      if (item.isPurchased) {
-        return false;
-      }
-
-      if (item.estimatedPurchaseDate == null) {
-        return false;
-      }
-
-      final estimatedDate = DateTime.fromMillisecondsSinceEpoch(
-        item.estimatedPurchaseDate!,
-      );
-
-      final diff = estimatedDate.difference(now).inDays;
-
-      return diff >= 0 && diff <= 7;
-    }).toList();
   }
 }

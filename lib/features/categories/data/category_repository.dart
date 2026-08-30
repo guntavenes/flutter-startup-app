@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:drift/drift.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/database/entity_id_generator.dart';
 
 class CategoryRepository {
   CategoryRepository(this._db, this._sharedListRepository);
@@ -37,26 +38,31 @@ class CategoryRepository {
     await _db.batch((batch) {
       batch.insertAll(_db.categories, [
         CategoriesCompanion.insert(
+          id: Value(EntityIdGenerator.next()),
           name: 'Mutfak',
           iconName: const Value('restaurant'),
           createdAt: now,
         ),
         CategoriesCompanion.insert(
+          id: Value(EntityIdGenerator.next()),
           name: 'Yatak Odası',
           iconName: const Value('bed'),
           createdAt: now,
         ),
         CategoriesCompanion.insert(
+          id: Value(EntityIdGenerator.next()),
           name: 'Banyo',
           iconName: const Value('shower'),
           createdAt: now,
         ),
         CategoriesCompanion.insert(
+          id: Value(EntityIdGenerator.next()),
           name: 'Salon',
           iconName: const Value('weekend'),
           createdAt: now,
         ),
         CategoriesCompanion.insert(
+          id: Value(EntityIdGenerator.next()),
           name: 'Elektronik',
           iconName: const Value('electrical'),
           createdAt: now,
@@ -118,6 +124,7 @@ class CategoryRepository {
         .into(_db.categories)
         .insert(
           CategoriesCompanion.insert(
+            id: Value(EntityIdGenerator.next()),
             name: trimmedName,
             iconName: Value(iconName),
             createdAt: now,

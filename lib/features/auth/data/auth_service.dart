@@ -122,14 +122,18 @@ class AuthService {
         .collection('users')
         .doc(user.uid);
 
-    await userRef.set({
-      'uid': user.uid,
-      'displayName': user.displayName,
-      'email': user.email,
-      'isAnonymous': user.isAnonymous,
-      'updatedAt': FieldValue.serverTimestamp(),
-      'createdAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
+    await FirebaseFirestore.instance.runTransaction((transaction) async {
+      final snapshot = await transaction.get(userRef);
+
+      transaction.set(userRef, {
+        'uid': user.uid,
+        'displayName': user.displayName,
+        'email': user.email,
+        'isAnonymous': user.isAnonymous,
+        'updatedAt': FieldValue.serverTimestamp(),
+        if (!snapshot.exists) 'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    });
   }
 
   static Future<void> signOut() async {

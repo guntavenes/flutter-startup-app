@@ -1,30 +1,40 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
+import 'package:ceyizim_plus/core/database/entity_id_generator.dart';
+import 'package:ceyizim_plus/core/extensions/date_extensions.dart';
+import 'package:ceyizim_plus/core/formatters/title_case_text_formatter.dart';
+import 'package:ceyizim_plus/core/formatters/turkish_currency_input_formatter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-//import 'package:flutter_startup_app/main.dart';
-
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    //await tester.pumpWidget(const MyApp());
+  test('üretilen kimlikler pozitif, güvenli aralıkta ve benzersizdir', () {
+    final ids = List.generate(1000, (_) => EntityIdGenerator.next());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    expect(ids.every((id) => id > 0 && id < (1 << 52)), isTrue);
+    expect(ids.toSet(), hasLength(ids.length));
+  });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  test('tarih uzantısı boş ve dolu değerleri biçimlendirir', () {
+    int? emptyDate;
+    final date = DateTime(2026, 8, 30).millisecondsSinceEpoch;
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(emptyDate.toShortDateText(), '-');
+    expect(date.toShortDateText(), '30.08.2026');
+  });
+
+  test('başlık biçimlendirici kelimelerin ilk harfini büyütür', () {
+    final result = TitleCaseTextFormatter().formatEditUpdate(
+      TextEditingValue.empty,
+      const TextEditingValue(text: 'hello WORLD'),
+    );
+
+    expect(result.text, 'Hello World');
+  });
+
+  test('para biçimlendirici binlik ayırıcı ekler', () {
+    final result = TurkishCurrencyInputFormatter().formatEditUpdate(
+      TextEditingValue.empty,
+      const TextEditingValue(text: '1234567'),
+    );
+
+    expect(result.text, '1.234.567');
   });
 }

@@ -11,22 +11,40 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_store_plus/media_store_plus.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
-import 'dart:async';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'firebase_options.dart';
-import 'package:firebase_analytics/firebase_analytics.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 Future<void> main() async {
-  await runZonedGuarded(
-    () async {
-      WidgetsFlutterBinding.ensureInitialized();
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const ProviderScope(child: _BootstrapApp()));
+}
 
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
+class _BootstrapApp extends StatefulWidget {
+  const _BootstrapApp();
 
+  @override
+  State<_BootstrapApp> createState() => _BootstrapAppState();
+}
+
+class _BootstrapAppState extends State<_BootstrapApp> {
+  late Future<void> _initialization = _initializeServices();
+
+  Future<void> _initializeServices() async {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
+
+    // App Check veya bulut senkronizasyonu geçici olarak çalışmasa bile yerel
+    // verilerle uygulamanın açılmasına izin ver.
+    try {
       await FirebaseAppCheck.instance.activate(
         providerAndroid: kDebugMode
             ? const AndroidDebugProvider()
@@ -36,43 +54,78 @@ Future<void> main() async {
             : const AppleDeviceCheckProvider(),
       );
 
-      FlutterError.onError =
-          FirebaseCrashlytics.instance.recordFlutterFatalError;
-
-      PlatformDispatcher.instance.onError = (error, stack) {
-        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-        return true;
-      };
-
       final user = await AuthService.ensureSignedIn();
-
       if (user != null) {
-        final repository = SharedListRepository();
-        await repository.ensureActiveListForUser(user);
+        await SharedListRepository().ensureActiveListForUser(user);
       }
+    } catch (error, stack) {
+      await FirebaseCrashlytics.instance.recordError(error, stack);
+    }
 
-      if (Platform.isAndroid) {
+    if (Platform.isAndroid) {
+      try {
         MediaStore.ensureInitialized();
         MediaStore.appFolder = 'Ceyiz Takip';
-
         await NotificationService.initialize();
-
         await Workmanager().initialize(callbackDispatcher);
-
         await Workmanager().registerPeriodicTask(
           'today-planned-items-periodic-task',
           todayPlannedItemsTask,
           frequency: const Duration(hours: 24),
           existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
         );
+      } catch (error, stack) {
+        await FirebaseCrashlytics.instance.recordError(error, stack);
       }
+    }
+  }
 
-      final analytics = FirebaseAnalytics.instance;
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<void>(
+      future: _initialization,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.done &&
+            !snapshot.hasError) {
+          return const StartupApp();
+        }
 
-      runApp(const ProviderScope(child: StartupApp()));
-    },
-    (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    },
-  );
+        if (snapshot.hasError) {
+          return MaterialApp(
+            debugShowCheckedModeBanner: false,
+            home: Scaffold(
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'Uygulama başlatılamadı. İnternet bağlantını kontrol edip tekrar deneyebilirsin.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: () {
+                          setState(() {
+                            _initialization = _initializeServices();
+                          });
+                        },
+                        child: const Text('Tekrar dene'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return const MaterialApp(
+          debugShowCheckedModeBanner: false,
+          home: Scaffold(body: Center(child: CircularProgressIndicator())),
+        );
+      },
+    );
+  }
 }

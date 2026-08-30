@@ -8,6 +8,7 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/database/entity_id_generator.dart';
 
 class ItemRepository {
   final NotificationRepository _notificationRepository;
@@ -31,7 +32,10 @@ class ItemRepository {
   }
 
   Future<int> addItem(ItemsCompanion item) async {
-    final insertedId = await _database.into(_database.items).insert(item);
+    final insertedId = EntityIdGenerator.next();
+    await _database
+        .into(_database.items)
+        .insert(item.copyWith(id: Value(insertedId)));
 
     final insertedItem = await (_database.select(
       _database.items,
@@ -371,12 +375,6 @@ class ItemRepository {
         .set(_itemToMap(item), SetOptions(merge: true));
   }
 
-  Future<void> _deleteItemFromFirestore(int id) async {
-    final collection = await _itemsCollection();
-
-    await collection.doc(id.toString()).delete();
-  }
-
   Map<String, dynamic> _itemToMap(Item item) {
     return {
       'id': item.id,
@@ -401,16 +399,24 @@ class ItemRepository {
   }
 
   Future<void> addItemsFromTemplate(List<ItemsCompanion> items) async {
+    final itemsWithIds = items
+        .map((item) => item.copyWith(id: Value(EntityIdGenerator.next())))
+        .toList();
+
     await _database.batch((batch) {
-      batch.insertAll(_database.items, items);
+      batch.insertAll(_database.items, itemsWithIds);
     });
 
     await syncAllItemsToFirestore();
   }
 
   Future<void> addItemsToLocalOnly(List<ItemsCompanion> items) async {
+    final itemsWithIds = items
+        .map((item) => item.copyWith(id: Value(EntityIdGenerator.next())))
+        .toList();
+
     await _database.batch((batch) {
-      batch.insertAll(_database.items, items);
+      batch.insertAll(_database.items, itemsWithIds);
     });
   }
 

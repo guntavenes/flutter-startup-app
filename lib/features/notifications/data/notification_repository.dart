@@ -6,15 +6,10 @@ import '../../shared_lists/data/shared_list_repository.dart';
 import '../models/shared_notification.dart';
 
 class NotificationRepository {
-  final FirebaseFirestore _firestore;
   final FirebaseAuth _auth;
   final SharedListRepository _sharedListRepository;
 
-  NotificationRepository(
-    this._firestore,
-    this._auth,
-    this._sharedListRepository,
-  );
+  NotificationRepository(this._auth, this._sharedListRepository);
 
   Future<void> addItemPurchasedNotification({
     required int itemId,

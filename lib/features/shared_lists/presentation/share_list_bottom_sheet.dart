@@ -22,7 +22,6 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
   bool _isJoining = false;
   final TextEditingController _displayNameController = TextEditingController();
   bool _isSavingName = false;
-  bool _isCurrentListCode = false;
 
   @override
   void initState() {
@@ -55,6 +54,8 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
   Future<void> _joinList() async {
     FocusManager.instance.primaryFocus?.unfocus();
     await Future.delayed(const Duration(milliseconds: 120));
+
+    if (!mounted) return;
 
     final code = _inviteCodeController.text.trim().toUpperCase();
 
@@ -167,25 +168,6 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
         });
       }
     }
-  }
-
-  Future<void> _onInviteCodeChanged(String value) async {
-    final code = value.trim().toUpperCase();
-
-    if (code.isEmpty) {
-      setState(() {
-        _isCurrentListCode = false;
-      });
-      return;
-    }
-
-    final currentCode = await ref.read(inviteCodeProvider.future);
-
-    if (!mounted) return;
-
-    setState(() {
-      _isCurrentListCode = currentCode == code;
-    });
   }
 
   Future<void> _leaveList() async {

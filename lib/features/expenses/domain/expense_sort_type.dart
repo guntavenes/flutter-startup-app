@@ -1,6 +1,1 @@
-enum ExpenseSortType {
-  dateDesc,
-  dateAsc,
-  priceDesc,
-  priceAsc
-}
+enum ExpenseSortType { dateDesc, dateAsc, priceDesc, priceAsc }

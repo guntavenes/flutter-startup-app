@@ -54,7 +54,7 @@ class SafeLocalImage extends StatelessWidget {
       fit: fit,
       cacheWidth: cacheWidth,
       cacheHeight: cacheHeight,
-      errorBuilder: (_, __, ___) => fallback,
+      errorBuilder: (_, _, _) => fallback,
     );
   }
 }
