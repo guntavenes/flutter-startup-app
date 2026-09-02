@@ -25,5 +25,6 @@ class AppTheme {
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     ),
+    materialTapTargetSize: MaterialTapTargetSize.padded,
   );
 }

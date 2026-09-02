@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/database/app_database.dart';
 import '../../../core/database/entity_id_generator.dart';
+import '../../../core/sync/sync_status.dart';
 
 class ItemRepository {
   final NotificationRepository _notificationRepository;
@@ -160,6 +161,11 @@ class ItemRepository {
           }
 
           final isDeleted = data['isDeleted'] as bool? ?? false;
+          final remoteUpdateAt = (data['updateAt'] as num?)?.toInt() ?? 0;
+
+          if (!await _shouldApplyRemoteItem(id, remoteUpdateAt)) {
+            continue;
+          }
 
           if (isDeleted) {
             await (_database.delete(
@@ -168,35 +174,7 @@ class ItemRepository {
             continue;
           }
 
-          await _database
-              .into(_database.items)
-              .insertOnConflictUpdate(
-                ItemsCompanion(
-                  id: Value(id),
-                  categoryId: Value((data['categoryId'] as num).toInt()),
-                  name: Value(data['name'] as String),
-                  brand: Value(data['brand'] as String?),
-                  model: Value(data['model'] as String?),
-                  link: Value(data['link'] as String?),
-                  plannedPrice: Value(
-                    (data['plannedPrice'] as num?)?.toDouble(),
-                  ),
-                  purchasedPrice: Value(
-                    (data['purchasedPrice'] as num?)?.toDouble(),
-                  ),
-                  purchaseDate: Value((data['purchaseDate'] as num?)?.toInt()),
-                  storeName: Value(data['storeName'] as String?),
-                  note: Value(data['note'] as String?),
-                  extraFeatures: Value(data['extraFeatures'] as String?),
-                  imagePath: Value(data['imagePath'] as String?),
-                  isPurchased: Value(data['isPurchased'] as bool? ?? false),
-                  createdAt: Value((data['createdAt'] as num).toInt()),
-                  updateAt: Value((data['updateAt'] as num).toInt()),
-                  estimatedPurchaseDate: Value(
-                    (data['estimatedPurchaseDate'] as num?)?.toInt(),
-                  ),
-                ),
-              );
+          await _upsertRemoteItem(id, data);
         } catch (e, stackTrace) {
           debugPrint('SHARED_ITEM_SYNC_ERROR (${doc.id}): $e');
           debugPrintStack(stackTrace: stackTrace);
@@ -207,6 +185,25 @@ class ItemRepository {
 
   Stream<List<Item>> watchAllItems() {
     return _database.select(_database.items).watch();
+  }
+
+  Stream<SyncStatus> watchSyncStatus() async* {
+    final collection = await _itemsCollection();
+    try {
+      await for (final snapshot in collection.snapshots(
+        includeMetadataChanges: true,
+      )) {
+        if (snapshot.metadata.hasPendingWrites) {
+          yield SyncStatus.syncing;
+        } else if (snapshot.metadata.isFromCache) {
+          yield SyncStatus.offline;
+        } else {
+          yield SyncStatus.synced;
+        }
+      }
+    } catch (_) {
+      yield SyncStatus.error;
+    }
   }
 
   Future<int> updateItemDetails({
@@ -244,6 +241,14 @@ class ItemRepository {
     }, SetOptions(merge: true));
 
     return result;
+  }
+
+  Future<void> restoreDeletedItem(Item item) async {
+    final restored = item.copyWith(
+      updateAt: DateTime.now().millisecondsSinceEpoch,
+    );
+    await _database.into(_database.items).insertOnConflictUpdate(restored);
+    await _setItemToFirestore(restored);
   }
 
   Future<int> togglePurchased(Item item) async {
@@ -427,35 +432,57 @@ class ItemRepository {
     for (final doc in snapshot.docs) {
       final data = doc.data();
       final id = (data['id'] as num).toInt();
+      final remoteUpdateAt = (data['updateAt'] as num?)?.toInt() ?? 0;
 
-      await _database
-          .into(_database.items)
-          .insertOnConflictUpdate(
-            ItemsCompanion(
-              id: Value(id),
-              categoryId: Value(data['categoryId'] as int),
-              name: Value(data['name'] as String),
-              brand: Value(data['brand'] as String?),
-              model: Value(data['model'] as String?),
-              link: Value(data['link'] as String?),
-              plannedPrice: Value((data['plannedPrice'] as num?)?.toDouble()),
-              purchasedPrice: Value(
-                (data['purchasedPrice'] as num?)?.toDouble(),
-              ),
-              purchaseDate: Value(data['purchaseDate'] as int?),
-              storeName: Value(data['storeName'] as String?),
-              note: Value(data['note'] as String?),
-              extraFeatures: Value(data['extraFeatures'] as String?),
-              imagePath: Value(data['imagePath'] as String?),
-              isPurchased: Value(data['isPurchased'] as bool? ?? false),
-              createdAt: Value(data['createdAt'] as int),
-              updateAt: Value(data['updateAt'] as int),
-              estimatedPurchaseDate: Value(
-                data['estimatedPurchaseDate'] as int?,
-              ),
-            ),
-          );
+      if (data['isDeleted'] == true) {
+        if (await _shouldApplyRemoteItem(id, remoteUpdateAt)) {
+          await (_database.delete(
+            _database.items,
+          )..where((tbl) => tbl.id.equals(id))).go();
+        }
+        continue;
+      }
+
+      if (await _shouldApplyRemoteItem(id, remoteUpdateAt)) {
+        await _upsertRemoteItem(id, data);
+      }
     }
+  }
+
+  Future<bool> _shouldApplyRemoteItem(int id, int remoteUpdateAt) async {
+    final localItem = await (_database.select(
+      _database.items,
+    )..where((tbl) => tbl.id.equals(id))).getSingleOrNull();
+
+    return localItem == null || remoteUpdateAt >= localItem.updateAt;
+  }
+
+  Future<void> _upsertRemoteItem(int id, Map<String, dynamic> data) async {
+    await _database
+        .into(_database.items)
+        .insertOnConflictUpdate(
+          ItemsCompanion(
+            id: Value(id),
+            categoryId: Value((data['categoryId'] as num).toInt()),
+            name: Value(data['name'] as String),
+            brand: Value(data['brand'] as String?),
+            model: Value(data['model'] as String?),
+            link: Value(data['link'] as String?),
+            plannedPrice: Value((data['plannedPrice'] as num?)?.toDouble()),
+            purchasedPrice: Value((data['purchasedPrice'] as num?)?.toDouble()),
+            purchaseDate: Value((data['purchaseDate'] as num?)?.toInt()),
+            storeName: Value(data['storeName'] as String?),
+            note: Value(data['note'] as String?),
+            extraFeatures: Value(data['extraFeatures'] as String?),
+            imagePath: Value(data['imagePath'] as String?),
+            isPurchased: Value(data['isPurchased'] as bool? ?? false),
+            createdAt: Value((data['createdAt'] as num).toInt()),
+            updateAt: Value((data['updateAt'] as num).toInt()),
+            estimatedPurchaseDate: Value(
+              (data['estimatedPurchaseDate'] as num?)?.toInt(),
+            ),
+          ),
+        );
   }
 
   Future<void> addTemplateItemsAndSync(List<ItemsCompanion> companions) async {
@@ -464,7 +491,10 @@ class ItemRepository {
     final collection = await _itemsCollection();
 
     for (final companion in companions) {
-      final id = await _database.into(_database.items).insert(companion);
+      final id = EntityIdGenerator.next();
+      await _database
+          .into(_database.items)
+          .insert(companion.copyWith(id: Value(id)));
 
       final item = await (_database.select(
         _database.items,

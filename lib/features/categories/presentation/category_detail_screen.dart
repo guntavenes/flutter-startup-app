@@ -241,6 +241,20 @@ class _CategoryDetailScreenState extends ConsumerState<CategoryDetailScreen> {
 
     await repo.deleteItemById(item.id);
     await _reloadCategoryItemsFromDb();
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('${item.name} silindi.'),
+        behavior: SnackBarBehavior.floating,
+        action: SnackBarAction(
+          label: 'Geri Al',
+          onPressed: () async {
+            await repo.restoreDeletedItem(item);
+            await _reloadCategoryItemsFromDb();
+          },
+        ),
+      ),
+    );
   }
 
   Widget _buildSummaryHeader(List<Item> items) {

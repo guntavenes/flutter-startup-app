@@ -297,6 +297,71 @@ class SharedListRepository {
     return doc.data()?['inviteCode'] as String?;
   }
 
+  Future<Map<String, dynamic>> getActiveListDetails() async {
+    final user = await _requireCurrentUser();
+    final ref = await getActiveListRef();
+    final snapshot = await ref.get();
+    final data = snapshot.data() ?? <String, dynamic>{};
+    return {
+      'name': data['name'] as String? ?? 'Çeyiz Listem',
+      'isOwner': data['ownerId'] == user.uid,
+    };
+  }
+
+  Future<void> updateActiveListName(String name) async {
+    final trimmed = name.trim();
+    if (trimmed.length < 2 || trimmed.length > 50) {
+      throw Exception('Liste adı 2-50 karakter arasında olmalı.');
+    }
+    final ref = await getActiveListRef();
+    await ref.update({
+      'name': trimmed,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<String> regenerateInviteCode() async {
+    final user = await _requireCurrentUser();
+    final listRef = await getActiveListRef();
+
+    for (var attempt = 0; attempt < 5; attempt++) {
+      final newCode = _generateInviteCode();
+      final newRef = _firestore.collection('inviteCodes').doc(newCode);
+      try {
+        await _firestore.runTransaction((transaction) async {
+          final listSnapshot = await transaction.get(listRef);
+          final newSnapshot = await transaction.get(newRef);
+          if (newSnapshot.exists) throw StateError('code-collision');
+          final data = listSnapshot.data();
+          if (data?['ownerId'] != user.uid) {
+            throw Exception(
+              'Davet kodunu yalnızca liste sahibi yenileyebilir.',
+            );
+          }
+          final oldCode = data?['inviteCode'] as String?;
+          transaction.update(listRef, {
+            'inviteCode': newCode,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+          transaction.set(newRef, {
+            'listId': listRef.id,
+            'ownerId': user.uid,
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+          if (oldCode != null && oldCode.isNotEmpty) {
+            transaction.delete(
+              _firestore.collection('inviteCodes').doc(oldCode),
+            );
+          }
+        });
+        return newCode;
+      } on StateError {
+        continue;
+      }
+    }
+    throw Exception('Yeni davet kodu oluşturulamadı. Lütfen tekrar dene.');
+  }
+
   Future<User> _requireCurrentUser() async {
     final existingUser = FirebaseAuth.instance.currentUser;
 

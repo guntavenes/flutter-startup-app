@@ -2,6 +2,7 @@ import 'package:ceyizim_plus/core/database/entity_id_generator.dart';
 import 'package:ceyizim_plus/core/extensions/date_extensions.dart';
 import 'package:ceyizim_plus/core/formatters/title_case_text_formatter.dart';
 import 'package:ceyizim_plus/core/formatters/turkish_currency_input_formatter.dart';
+import 'package:ceyizim_plus/core/sync/sync_status.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -10,6 +11,13 @@ void main() {
 
     expect(ids.every((id) => id > 0 && id < (1 << 52)), isTrue);
     expect(ids.toSet(), hasLength(ids.length));
+  });
+
+  test('senkronizasyon durumları kullanıcıya anlaşılır metin verir', () {
+    expect(SyncStatus.synced.label, 'Tüm değişiklikler güncel');
+    expect(SyncStatus.syncing.label, 'Değişiklikler eşitleniyor');
+    expect(SyncStatus.offline.label, contains('Çevrimdışı'));
+    expect(SyncStatus.error.label, contains('tekrar'));
   });
 
   test('tarih uzantısı boş ve dolu değerleri biçimlendirir', () {

@@ -10,6 +10,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   firebase_auth
   firebase_core
   firebase_remote_config
+  printing
   share_plus
   url_launcher_windows
 )

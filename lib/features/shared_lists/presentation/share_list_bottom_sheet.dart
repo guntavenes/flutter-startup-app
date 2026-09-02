@@ -1,4 +1,6 @@
 import 'package:ceyizim_plus/features/items/data/item_providers.dart';
+import 'package:ceyizim_plus/core/errors/user_friendly_error.dart';
+import 'package:ceyizim_plus/core/database/database_provider.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,6 +24,9 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
   bool _isJoining = false;
   final TextEditingController _displayNameController = TextEditingController();
   bool _isSavingName = false;
+  final TextEditingController _listNameController = TextEditingController();
+  bool _isSavingList = false;
+  bool _isRegeneratingCode = false;
 
   @override
   void initState() {
@@ -35,6 +40,7 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
   void dispose() {
     _inviteCodeController.dispose();
     _displayNameController.dispose();
+    _listNameController.dispose();
     super.dispose();
   }
 
@@ -82,6 +88,10 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
     try {
       await ref.read(sharedListRepositoryProvider).joinListWithInviteCode(code);
 
+      // Uygulama tek aktif liste kullanır. Önceki listenin yerel kayıtlarını
+      // hedef listeye karıştırmadan temizle; ardından hedef listeyi indir.
+      await ref.read(appDatabaseProvider).clearLocalListData();
+
       ref.invalidate(activeListIdProvider);
       ref.invalidate(inviteCodeProvider);
       ref.invalidate(itemRepositoryProvider);
@@ -116,7 +126,7 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          content: Text(userFriendlyError(error)),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -126,6 +136,82 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
           _isJoining = false;
         });
       }
+    }
+  }
+
+  Future<void> _saveListName() async {
+    setState(() => _isSavingList = true);
+    try {
+      await ref
+          .read(sharedListRepositoryProvider)
+          .updateActiveListName(_listNameController.text);
+      ref.invalidate(activeListDetailsProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Liste adı güncellendi.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(userFriendlyError(error)),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSavingList = false);
+    }
+  }
+
+  Future<void> _regenerateInviteCode() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Davet kodu yenilensin mi?'),
+        content: const Text(
+          'Eski kod hemen geçersiz olacak. Mevcut liste üyeleri etkilenmeyecek.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Vazgeç'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Yenile'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _isRegeneratingCode = true);
+    try {
+      await ref.read(sharedListRepositoryProvider).regenerateInviteCode();
+      ref.invalidate(inviteCodeProvider);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Davet kodu yenilendi.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(userFriendlyError(error)),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRegeneratingCode = false);
     }
   }
 
@@ -200,6 +286,10 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
 
       await ref.read(sharedListRepositoryProvider).leaveActiveSharedList();
 
+      // Ayrılınca telefondaki ürünler yeni kişisel listeye kopyalanır.
+      await ref.read(categoryRepositoryProvider).insertDefaultCategories();
+      await ref.read(itemRepositoryProvider).syncAllItemsToFirestore();
+
       ref.invalidate(activeListIdProvider);
       ref.invalidate(inviteCodeProvider);
       ref.invalidate(membersProvider);
@@ -224,7 +314,7 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(error.toString().replaceFirst('Exception: ', '')),
+          content: Text(userFriendlyError(error)),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -236,6 +326,7 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
     final inviteCodeAsync = ref.watch(inviteCodeProvider);
 
     final membersAsync = ref.watch(membersProvider);
+    final listDetailsAsync = ref.watch(activeListDetailsProvider);
 
     final currentInviteCode = inviteCodeAsync.value?.trim().toUpperCase();
 
@@ -379,6 +470,64 @@ class _ShareListBottomSheetState extends ConsumerState<ShareListBottomSheet> {
                               ),
                             ),
                           ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+
+              listDetailsAsync.when(
+                loading: () => const SizedBox.shrink(),
+                error: (_, _) => const SizedBox.shrink(),
+                data: (details) {
+                  final isOwner = details['isOwner'] == true;
+                  if (!isOwner) return const SizedBox.shrink();
+                  final currentName = details['name'] as String? ?? '';
+                  if (_listNameController.text.isEmpty) {
+                    _listNameController.text = currentName;
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 14),
+                    child: Column(
+                      children: [
+                        TextField(
+                          controller: _listNameController,
+                          maxLength: 50,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: const InputDecoration(
+                            labelText: 'Liste adı',
+                            prefixIcon: Icon(Icons.edit_outlined),
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _isSavingList ? null : _saveListName,
+                                icon: const Icon(Icons.save_outlined),
+                                label: Text(
+                                  _isSavingList
+                                      ? 'Kaydediliyor...'
+                                      : 'Adı Kaydet',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: _isRegeneratingCode
+                                    ? null
+                                    : _regenerateInviteCode,
+                                icon: const Icon(Icons.refresh_rounded),
+                                label: Text(
+                                  _isRegeneratingCode
+                                      ? 'Yenileniyor...'
+                                      : 'Kodu Yenile',
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

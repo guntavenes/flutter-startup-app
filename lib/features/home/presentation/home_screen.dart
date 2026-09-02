@@ -5,13 +5,18 @@ import 'package:ceyizim_plus/core/database/database_provider.dart';
 import 'package:ceyizim_plus/core/extensions/currency_extensions.dart';
 import 'package:ceyizim_plus/core/extensions/date_extensions.dart';
 import 'package:ceyizim_plus/core/notifications/notification_planner_service.dart';
+import 'package:ceyizim_plus/core/sync/sync_status.dart';
+import 'package:ceyizim_plus/core/widgets/skeleton_loader.dart';
 import 'package:ceyizim_plus/features/auth/data/auth_providers.dart';
 import 'package:ceyizim_plus/features/auth/data/auth_service.dart';
+import 'package:ceyizim_plus/features/budget/presentation/budget_screen.dart';
+import 'package:ceyizim_plus/features/budget/data/budget_providers.dart';
 import 'package:ceyizim_plus/features/categories/data/category_providers.dart';
 import 'package:ceyizim_plus/features/categories/presentation/category_detail_screen.dart';
 import 'package:ceyizim_plus/features/categories/presentation/category_management_screen.dart';
 import 'package:ceyizim_plus/features/expenses/presentation/expense_detail_screen.dart';
 import 'package:ceyizim_plus/features/export/data/excel_export_service.dart';
+import 'package:ceyizim_plus/features/export/data/pdf_report_service.dart';
 import 'package:ceyizim_plus/features/items/data/item_providers.dart';
 import 'package:ceyizim_plus/features/items/data/item_repository_provider.dart';
 import 'package:ceyizim_plus/features/items/domain/planned_item_filter.dart';
@@ -19,6 +24,7 @@ import 'package:ceyizim_plus/features/items/presentation/item_form_screen.dart';
 import 'package:ceyizim_plus/features/items/presentation/item_list_screen.dart';
 import 'package:ceyizim_plus/features/items/presentation/planned_items_screen.dart';
 import 'package:ceyizim_plus/features/items/presentation/recent_purchased_screen.dart';
+import 'package:ceyizim_plus/features/insights/presentation/smart_insights_screen.dart';
 import 'package:ceyizim_plus/features/notifications/data/notification_providers.dart';
 import 'package:ceyizim_plus/features/notifications/models/shared_notification.dart';
 import 'package:ceyizim_plus/features/notifications/presentation/shared_notifications_screen.dart';
@@ -26,6 +32,7 @@ import 'package:ceyizim_plus/features/shared_lists/data/shared_list_providers.da
 import 'package:ceyizim_plus/features/shared_lists/models/shared_member.dart';
 import 'package:ceyizim_plus/features/shared_lists/presentation/share_list_bottom_sheet.dart';
 import 'package:ceyizim_plus/features/templates/presentation/template_preview_screen.dart';
+import 'package:ceyizim_plus/features/settings/presentation/settings_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,6 +47,19 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   StreamSubscription<void>? _sharedItemsSubscription;
   StreamSubscription<void>? _sharedCategoriesSubscription;
+  bool _syncRetryScheduled = false;
+  final Set<int> _collapsedCategoryIds = <int>{};
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _surface => _isDark ? const Color(0xFF2A2027) : Colors.white;
+  Color get _surfaceSoft =>
+      _isDark ? const Color(0xFF352832) : const Color(0xFFFFF7FB);
+  Color get _primaryText =>
+      _isDark ? const Color(0xFFFFF4F8) : const Color(0xFF2C1E26);
+  Color get _secondaryText =>
+      _isDark ? const Color(0xFFD7BAC8) : const Color(0xFF8A6B79);
+  Color get _outline =>
+      _isDark ? const Color(0xFF604451) : const Color(0xFFFFD6EA);
 
   @override
   void dispose() {
@@ -100,6 +120,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         onError: (error, stackTrace) {
           debugPrint('SHARED_ITEMS_LISTENER_ERROR: $error');
           debugPrintStack(stackTrace: stackTrace);
+          _scheduleSyncRetry();
         },
       );
 
@@ -116,14 +137,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     await NotificationPlannerService.checkTodayItems(database);
   }
 
+  Widget _buildHomeSkeleton() => const Padding(
+    padding: EdgeInsets.only(top: 4),
+    child: SkeletonLoader(height: 132),
+  );
+
   @override
   Widget build(BuildContext context) {
     ref.watch(authStateProvider);
     final allItemsAsync = ref.watch(allItemsProvider);
     final groupedItemsAsync = ref.watch(groupedItemsProvider);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFFFF5FA),
+      backgroundColor: isDark
+          ? const Color(0xFF181217)
+          : const Color(0xFFFFF5FA),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.of(
@@ -133,9 +162,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: const Icon(Icons.add),
       ),
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFFFFF5FA), Color(0xFFFFF7F0)],
+            colors: isDark
+                ? const [Color(0xFF181217), Color(0xFF21191E)]
+                : const [Color(0xFFFFF5FA), Color(0xFFFFF7F0)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           ),
@@ -152,6 +183,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     error: (_, _) => _buildTopBar([]),
                     data: (allItems) => _buildTopBar(allItems),
                   ),
+                  _buildSyncStatusBanner(),
                   const SizedBox(height: 14),
                   allItemsAsync.when(
                     loading: () => _buildSummary([]),
@@ -177,10 +209,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     },
                   ),
                   groupedItemsAsync.when(
-                    loading: () => const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Center(child: CircularProgressIndicator()),
-                    ),
+                    loading: _buildHomeSkeleton,
                     error: (error, _) => Padding(
                       padding: const EdgeInsets.all(24),
                       child: Center(child: Text('Hata: $error')),
@@ -290,12 +319,94 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
               await _sharedCategoriesSubscription?.cancel();
               _sharedCategoriesSubscription = null;
+              _scheduleSyncRetry();
             },
           );
     } catch (error, stackTrace) {
       debugPrint('START_SHARED_CATEGORIES_LISTENER_ERROR: $error');
       debugPrintStack(stackTrace: stackTrace);
     }
+  }
+
+  void _scheduleSyncRetry() {
+    if (_syncRetryScheduled || !mounted) return;
+    _syncRetryScheduled = true;
+
+    Future<void>.delayed(const Duration(seconds: 3), () async {
+      _syncRetryScheduled = false;
+      if (!mounted) return;
+      await _startSharedCategoriesListener();
+      await _startSharedItemsListener();
+    });
+  }
+
+  Widget _buildSyncStatusBanner() {
+    final statusAsync = ref.watch(sharedItemsSyncStatusProvider);
+    final status =
+        statusAsync.value ??
+        (statusAsync.hasError ? SyncStatus.error : SyncStatus.syncing);
+
+    if (status == SyncStatus.synced) return const SizedBox.shrink();
+
+    final color = switch (status) {
+      SyncStatus.syncing => const Color(0xFF7B61A8),
+      SyncStatus.offline => const Color(0xFFE08A24),
+      SyncStatus.error => const Color(0xFFC44747),
+      SyncStatus.synced => const Color(0xFF3D9C68),
+    };
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Material(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: status == SyncStatus.error
+              ? () async {
+                  ref.invalidate(sharedItemsSyncStatusProvider);
+                  await _startSharedCategoriesListener();
+                  await _startSharedItemsListener();
+                }
+              : null,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(
+              children: [
+                if (status == SyncStatus.syncing)
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: color,
+                    ),
+                  )
+                else
+                  Icon(
+                    status == SyncStatus.offline
+                        ? Icons.cloud_off_rounded
+                        : Icons.sync_problem_rounded,
+                    size: 18,
+                    color: color,
+                  ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    status.label,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildSummary(List<Item> items) {
@@ -462,180 +573,249 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
           child: SafeArea(
             top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 42,
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFE8D3DD),
-                    borderRadius: BorderRadius.circular(99),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 42,
+                    height: 5,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE8D3DD),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
                   ),
-                ),
-                const SizedBox(height: 18),
+                  const SizedBox(height: 18),
 
-                Row(
-                  children: [
-                    Container(
-                      width: 52,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFFFC1DE), Color(0xFFD96BA7)],
-                        ),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: const Icon(
-                        Icons.tune_rounded,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Menü',
-                            style: TextStyle(
-                              fontSize: 21,
-                              fontWeight: FontWeight.w900,
-                              color: Color(0xFF2C1E26),
-                            ),
+                  Row(
+                    children: [
+                      Container(
+                        width: 52,
+                        height: 52,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFFC1DE), Color(0xFFD96BA7)],
                           ),
-                          SizedBox(height: 3),
-                          Text(
-                            'Liste ayarları ve dışa aktarma',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF9A7A89),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 18),
-
-                _buildHomeMenuTile(
-                  icon: Icons.category_outlined,
-                  title: 'Kategorileri Yönet',
-                  subtitle: 'Kategori ekle, düzenle veya sil',
-                  onTap: () async {
-                    Navigator.of(bottomSheetContext).pop();
-
-                    await Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const CategoryManagementScreen(),
-                      ),
-                    );
-
-                    if (!mounted) return;
-
-                    ref.invalidate(categoriesProvider);
-                    ref.invalidate(groupedItemsProvider);
-                  },
-                ),
-
-                _buildHomeMenuTile(
-                  icon: Icons.ios_share_rounded,
-                  title: 'Paylaş',
-                  subtitle: 'Davet kodu ile ortak liste oluştur',
-                  onTap: () async {
-                    Navigator.of(bottomSheetContext).pop();
-
-                    final result = await showModalBottomSheet<bool>(
-                      context: context,
-                      backgroundColor: Colors.transparent,
-                      isScrollControlled: true,
-                      enableDrag: true,
-                      isDismissible: true,
-                      builder: (_) => ShareListBottomSheet(
-                        onBeforeLeaveList: _stopSharedListeners,
-                      ),
-                    );
-
-                    if (result == true && mounted) {
-                      await _startSharedItemsListener();
-                      await _startSharedCategoriesListener();
-
-                      ref.invalidate(activeListIdProvider);
-
-                      ref.invalidate(inviteCodeProvider);
-
-                      ref.invalidate(membersProvider);
-
-                      ref.invalidate(notificationRepositoryProvider);
-
-                      ref.invalidate(sharedNotificationsProvider);
-
-                      ref.invalidate(categoriesProvider);
-                    }
-                  },
-                ),
-
-                _buildHomeMenuTile(
-                  icon: Icons.table_chart_rounded,
-                  title: 'Excel Olarak Dışa Aktar',
-                  subtitle: 'Listeyi Excel dosyası olarak oluştur',
-                  onTap: () async {
-                    Navigator.of(bottomSheetContext).pop();
-
-                    final path = await ExcelExportService.exportItems(
-                      items: allItems,
-                    );
-
-                    if (!mounted) return;
-
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          path == null
-                              ? 'Excel dosyası oluşturulamadı.'
-                              : 'Excel çıktısı hazırlandı.',
+                          borderRadius: BorderRadius.circular(18),
                         ),
-                        behavior: SnackBarBehavior.floating,
+                        child: const Icon(
+                          Icons.tune_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
-                    );
-                  },
-                ),
+                      const SizedBox(width: 14),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Menü',
+                              style: TextStyle(
+                                fontSize: 21,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF2C1E26),
+                              ),
+                            ),
+                            SizedBox(height: 3),
+                            Text(
+                              'Liste ayarları ve dışa aktarma',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF9A7A89),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
 
-                _buildHomeMenuTile(
-                  icon: Icons.login_rounded,
-                  title: 'Google Hesabına Geç',
-                  subtitle: 'Verilerini Google hesabınla eşitle',
-                  onTap: () async {
-                    Navigator.of(bottomSheetContext).pop();
+                  const SizedBox(height: 18),
 
-                    try {
-                      await AuthService.linkAnonymousUserWithGoogle();
+                  _buildHomeMenuTile(
+                    icon: Icons.savings_outlined,
+                    title: 'Bütçe Planı',
+                    subtitle: 'Bütçe, harcama ve kalan tutarı izle',
+                    onTap: () {
+                      Navigator.of(bottomSheetContext).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const BudgetScreen()),
+                      );
+                    },
+                  ),
+
+                  _buildHomeMenuTile(
+                    icon: Icons.auto_awesome_rounded,
+                    title: 'Akıllı Öneriler',
+                    subtitle: 'Eksikleri, öncelikleri ve bütçe riskini gör',
+                    onTap: () {
+                      Navigator.of(bottomSheetContext).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const SmartInsightsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+
+                  _buildHomeMenuTile(
+                    icon: Icons.category_outlined,
+                    title: 'Kategorileri Yönet',
+                    subtitle: 'Kategori ekle, düzenle veya sil',
+                    onTap: () async {
+                      Navigator.of(bottomSheetContext).pop();
+
+                      await Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const CategoryManagementScreen(),
+                        ),
+                      );
 
                       if (!mounted) return;
 
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Google hesabına geçildi.'),
-                          behavior: SnackBarBehavior.floating,
+                      ref.invalidate(categoriesProvider);
+                      ref.invalidate(groupedItemsProvider);
+                    },
+                  ),
+
+                  _buildHomeMenuTile(
+                    icon: Icons.ios_share_rounded,
+                    title: 'Paylaş',
+                    subtitle: 'Davet kodu ile ortak liste oluştur',
+                    onTap: () async {
+                      Navigator.of(bottomSheetContext).pop();
+
+                      final result = await showModalBottomSheet<bool>(
+                        context: context,
+                        backgroundColor: Colors.transparent,
+                        isScrollControlled: true,
+                        enableDrag: true,
+                        isDismissible: true,
+                        builder: (_) => ShareListBottomSheet(
+                          onBeforeLeaveList: _stopSharedListeners,
                         ),
                       );
-                    } catch (error) {
+
+                      if (result == true && mounted) {
+                        await _startSharedItemsListener();
+                        await _startSharedCategoriesListener();
+
+                        ref.invalidate(activeListIdProvider);
+
+                        ref.invalidate(inviteCodeProvider);
+
+                        ref.invalidate(membersProvider);
+
+                        ref.invalidate(notificationRepositoryProvider);
+
+                        ref.invalidate(sharedNotificationsProvider);
+
+                        ref.invalidate(categoriesProvider);
+                      }
+                    },
+                  ),
+
+                  _buildHomeMenuTile(
+                    icon: Icons.table_chart_rounded,
+                    title: 'Excel Olarak Dışa Aktar',
+                    subtitle: 'Listeyi Excel dosyası olarak oluştur',
+                    onTap: () async {
+                      Navigator.of(bottomSheetContext).pop();
+
+                      final path = await ExcelExportService.exportItems(
+                        items: allItems,
+                      );
+
                       if (!mounted) return;
 
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Google giriş hatası: $error'),
+                          content: Text(
+                            path == null
+                                ? 'Excel dosyası oluşturulamadı.'
+                                : 'Excel çıktısı hazırlandı.',
+                          ),
                           behavior: SnackBarBehavior.floating,
                         ),
                       );
-                    }
-                  },
-                ),
-              ],
+                    },
+                  ),
+
+                  _buildHomeMenuTile(
+                    icon: Icons.picture_as_pdf_rounded,
+                    title: 'PDF Raporu Oluştur',
+                    subtitle: 'İlerleme ve harcama raporunu paylaş',
+                    onTap: () async {
+                      Navigator.of(bottomSheetContext).pop();
+                      try {
+                        final categories =
+                            ref.read(categoriesProvider).value ?? <Category>[];
+                        final budget = await ref.read(budgetProvider.future);
+                        await PdfReportService.createAndShare(
+                          items: allItems,
+                          categories: categories,
+                          budget: budget,
+                        );
+                      } catch (error) {
+                        if (!mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('PDF oluşturulamadı: $error'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+
+                  _buildHomeMenuTile(
+                    icon: Icons.login_rounded,
+                    title: 'Google Hesabına Geç',
+                    subtitle: 'Verilerini Google hesabınla eşitle',
+                    onTap: () async {
+                      Navigator.of(bottomSheetContext).pop();
+
+                      try {
+                        await AuthService.linkAnonymousUserWithGoogle();
+
+                        if (!mounted) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Google hesabına geçildi.'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      } catch (error) {
+                        if (!mounted) return;
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Google giriş hatası: $error'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    },
+                  ),
+
+                  _buildHomeMenuTile(
+                    icon: Icons.settings_outlined,
+                    title: 'Ayarlar ve Hakkında',
+                    subtitle: 'Yenilikler, geri bildirim ve uygulama sürümü',
+                    onTap: () {
+                      Navigator.of(bottomSheetContext).pop();
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const SettingsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -660,7 +840,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: const Color(0xFFFFF6FA),
+        color: _surfaceSoft,
         borderRadius: BorderRadius.circular(22),
         child: InkWell(
           borderRadius: BorderRadius.circular(22),
@@ -685,28 +865,25 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w900,
-                          color: Color(0xFF2C1E26),
+                          color: _primaryText,
                         ),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF9A7A89),
+                          color: _secondaryText,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Color(0xFFB48A9D),
-                ),
+                Icon(Icons.chevron_right_rounded, color: _secondaryText),
               ],
             ),
           ),
@@ -731,7 +908,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _surface,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: const Color(0xFFFFD59E)),
         ),
@@ -756,23 +933,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 children: [
                   Text(
                     '${items.length} yaklaşan alım',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF2C1E26),
+                      color: _primaryText,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     '${firstItem.name} • ${firstItem.estimatedPurchaseDate.toShortDateText()}',
-                    style: const TextStyle(
-                      color: Color(0xFF8A6B79),
+                    style: TextStyle(
+                      color: _secondaryText,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF8A6B79)),
+            Icon(Icons.chevron_right_rounded, color: _secondaryText),
           ],
         ),
       ),
@@ -786,15 +963,20 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     Color color, {
     VoidCallback? onTap,
   }) {
+    final cardColor = _isDark
+        ? Color.alphaBlend(color.withValues(alpha: .15), _surface)
+        : color.withValues(alpha: .14);
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.14),
+            color: cardColor,
             borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: Colors.white),
+            border: Border.all(
+              color: _isDark ? color.withValues(alpha: .45) : Colors.white,
+            ),
             boxShadow: [
               BoxShadow(
                 color: color.withValues(alpha: 0.18),
@@ -809,18 +991,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 8),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 19,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFF2C1E26),
+                  color: _primaryText,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: Color(0xFF8A6B79),
+                  color: _secondaryText,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -958,11 +1140,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 colors: [Color(0xFFD96BA7), Color(0xFFFF8DBA)],
               )
             : null,
-        color: isSelected ? null : Colors.white,
+        color: isSelected ? null : _surface,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isSelected ? Colors.transparent : const Color(0xFFF0D7E5),
-        ),
+        border: Border.all(color: isSelected ? Colors.transparent : _outline),
         boxShadow: isSelected
             ? [
                 BoxShadow(
@@ -977,7 +1157,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         text,
         style: TextStyle(
           fontWeight: FontWeight.w700,
-          color: isSelected ? Colors.white : const Color(0xFF6D4C5B),
+          color: isSelected ? Colors.white : _primaryText,
         ),
       ),
     );
@@ -1180,7 +1360,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: _surface,
           borderRadius: BorderRadius.circular(24),
           border: Border.all(color: const Color(0xFFE7D6FF)),
         ),
@@ -1202,16 +1382,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 children: [
                   Text(
                     '${notifications.length} ortak liste hareketi',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF2C1E26),
+                      color: _primaryText,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     latest.message,
-                    style: const TextStyle(
-                      color: Color(0xFF8A6B79),
+                    style: TextStyle(
+                      color: _secondaryText,
                       fontWeight: FontWeight.w600,
                     ),
                     maxLines: 2,
@@ -1220,7 +1400,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF8A6B79)),
+            Icon(Icons.chevron_right_rounded, color: _secondaryText),
           ],
         ),
       ),
@@ -1240,14 +1420,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       0,
       (sum, item) => sum + (item.purchasedPrice ?? 0),
     );
+    final isCollapsed = _collapsedCategoryIds.contains(category.id);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: _surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFFFD6EA), width: 1.1),
+        border: Border.all(color: _outline, width: 1.1),
         boxShadow: [
           BoxShadow(
             color: const Color(0xFFD96BA7).withValues(alpha: 0.16),
@@ -1260,9 +1441,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           GestureDetector(
-            onTap: () {
-              _openCategoryDetail(category, items, currentFilter);
-            },
+            behavior: HitTestBehavior.opaque,
+            onTap: () => setState(() {
+              isCollapsed
+                  ? _collapsedCategoryIds.remove(category.id)
+                  : _collapsedCategoryIds.add(category.id);
+            }),
             child: Row(
               children: [
                 Container(
@@ -1287,121 +1471,136 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     children: [
                       Text(
                         category.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w900,
-                          color: Color(0xFF2C1E26),
+                          color: _primaryText,
                         ),
                       ),
                       const SizedBox(height: 3),
                       Text(
                         '${items.length} ürün',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF8A6B79),
+                          color: _secondaryText,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const Icon(
-                  Icons.chevron_right_rounded,
-                  color: Color(0xFF8A6B79),
+                AnimatedRotation(
+                  turns: isCollapsed ? 0 : .5,
+                  duration: const Duration(milliseconds: 220),
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: _secondaryText,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
+          if (!isCollapsed) ...[
+            const SizedBox(height: 12),
 
-          if (currentFilter == ItemFilter.all) ...[
-            Row(
-              children: [
-                _miniInfoCard(
-                  'Alınan',
-                  purchasedCount.toString(),
-                  const Color(0xFF7ACFA6),
-                  onTap: purchasedCount == 0
-                      ? null
-                      : () {
-                          _openCategoryDetail(
-                            category,
-                            purchasedItems,
-                            ItemFilter.purchased,
-                          );
-                        },
-                ),
-                const SizedBox(width: 10),
-                _miniInfoCard(
-                  'Kalan',
-                  remainingCount.toString(),
-                  const Color(0xFFFFB74D),
-                  onTap: remainingCount == 0
-                      ? null
-                      : () {
-                          _openCategoryDetail(
-                            category,
-                            remainingItems,
-                            ItemFilter.remaining,
-                          );
-                        },
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-          ] else if (currentFilter == ItemFilter.remaining) ...[
-            _singleInfoCard(
-              'Kalan Ürün',
-              items.length.toString(),
-              const Color(0xFFFFB74D),
-              onTap: () {
-                _openCategoryDetail(category, items, ItemFilter.remaining);
-              },
-            ),
-            const SizedBox(height: 12),
-          ] else if (currentFilter == ItemFilter.purchased) ...[
-            _singleInfoCard(
-              'Alınan Ürün',
-              items.length.toString(),
-              const Color(0xFF7ACFA6),
-              onTap: () {
-                _openCategoryDetail(category, items, ItemFilter.purchased);
-              },
-            ),
-            const SizedBox(height: 12),
-          ],
-
-          if (currentFilter != ItemFilter.remaining)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF7FB),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            if (currentFilter == ItemFilter.all) ...[
+              Row(
                 children: [
-                  Text(
-                    'Toplam Harcama',
-                    style: TextStyle(
-                      color: Colors.grey.shade600,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
+                  _miniInfoCard(
+                    'Alınan',
+                    purchasedCount.toString(),
+                    const Color(0xFF7ACFA6),
+                    onTap: purchasedCount == 0
+                        ? null
+                        : () {
+                            _openCategoryDetail(
+                              category,
+                              purchasedItems,
+                              ItemFilter.purchased,
+                            );
+                          },
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    totalExpense.toCurrency(),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFFD96BA7),
-                    ),
+                  const SizedBox(width: 10),
+                  _miniInfoCard(
+                    'Kalan',
+                    remainingCount.toString(),
+                    const Color(0xFFFFB74D),
+                    onTap: remainingCount == 0
+                        ? null
+                        : () {
+                            _openCategoryDetail(
+                              category,
+                              remainingItems,
+                              ItemFilter.remaining,
+                            );
+                          },
                   ),
                 ],
               ),
+              const SizedBox(height: 12),
+            ] else if (currentFilter == ItemFilter.remaining) ...[
+              _singleInfoCard(
+                'Kalan Ürün',
+                items.length.toString(),
+                const Color(0xFFFFB74D),
+                onTap: () {
+                  _openCategoryDetail(category, items, ItemFilter.remaining);
+                },
+              ),
+              const SizedBox(height: 12),
+            ] else if (currentFilter == ItemFilter.purchased) ...[
+              _singleInfoCard(
+                'Alınan Ürün',
+                items.length.toString(),
+                const Color(0xFF7ACFA6),
+                onTap: () {
+                  _openCategoryDetail(category, items, ItemFilter.purchased);
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            if (currentFilter != ItemFilter.remaining)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF7FB),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Toplam Harcama',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 12,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      totalExpense.toCurrency(),
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: Color(0xFFD96BA7),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () =>
+                    _openCategoryDetail(category, items, currentFilter),
+                icon: const Icon(Icons.open_in_new_rounded, size: 17),
+                label: const Text('Kategori detayı'),
+              ),
             ),
+          ],
         ],
       ),
     );
@@ -1419,26 +1618,26 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 10),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.14),
+          color: color.withValues(alpha: _isDark ? 0.22 : 0.14),
           borderRadius: BorderRadius.circular(18),
         ),
         child: Column(
           children: [
             Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w900,
-                color: Color(0xFF2C1E26),
+                color: _primaryText,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF8A6B79),
+                color: _secondaryText,
               ),
             ),
           ],
@@ -1459,26 +1658,30 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: onTap == null ? 0.07 : 0.14),
+            color: color.withValues(
+              alpha: _isDark
+                  ? (onTap == null ? 0.12 : 0.22)
+                  : (onTap == null ? 0.07 : 0.14),
+            ),
             borderRadius: BorderRadius.circular(15),
           ),
           child: Column(
             children: [
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w900,
-                  color: Color(0xFF2C1E26),
+                  color: _primaryText,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF8A6B79),
+                  color: _secondaryText,
                 ),
               ),
             ],
@@ -1525,9 +1728,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.92),
+          color: _surface,
           borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+          border: Border.all(color: _outline),
           boxShadow: [
             BoxShadow(
               color: const Color(0xFFD96BA7).withValues(alpha: 0.10),
@@ -1555,7 +1758,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1564,22 +1767,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF2C1E26),
+                      color: _primaryText,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     'Son 7 günde aldığın ürünleri görüntüle',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF8A6B79),
+                      color: _secondaryText,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF8A6B79)),
+            Icon(Icons.chevron_right_rounded, color: _secondaryText),
           ],
         ),
       ),
@@ -1626,9 +1829,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.92),
+          color: _surface,
           borderRadius: BorderRadius.circular(26),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.7)),
+          border: Border.all(color: _outline),
           boxShadow: [
             BoxShadow(
               color: const Color(0xFFD96BA7).withValues(alpha: 0.10),
@@ -1656,7 +1859,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
             ),
             const SizedBox(width: 14),
-            const Expanded(
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1665,22 +1868,22 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF2C1E26),
+                      color: _primaryText,
                     ),
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(
                     'Hazır Liste İle Hemen Başla',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF8A6B79),
+                      color: _secondaryText,
                     ),
                   ),
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right_rounded, color: Color(0xFF8A6B79)),
+            Icon(Icons.chevron_right_rounded, color: _secondaryText),
           ],
         ),
       ),

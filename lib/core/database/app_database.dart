@@ -17,6 +17,13 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => 3;
 
+  Future<void> clearLocalListData() async {
+    await transaction(() async {
+      await delete(items).go();
+      await delete(categories).go();
+    });
+  }
+
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(

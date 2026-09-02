@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 
 import '../../../core/database/app_database.dart';
+import '../../../core/sync/sync_status.dart';
 import '../../categories/data/category_providers.dart';
 import 'item_repository_provider.dart';
 
@@ -15,6 +16,10 @@ final allItemsProvider = StreamProvider<List<Item>>((ref) {
   final repository = ref.watch(itemRepositoryProvider);
 
   return repository.watchAllItems();
+});
+
+final sharedItemsSyncStatusProvider = StreamProvider<SyncStatus>((ref) {
+  return ref.watch(itemRepositoryProvider).watchSyncStatus();
 });
 
 final itemsProvider = Provider<AsyncValue<List<Item>>>((ref) {

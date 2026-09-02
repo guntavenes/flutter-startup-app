@@ -17,6 +17,10 @@ final inviteCodeProvider = FutureProvider<String?>((ref) async {
   return repository.getInviteCode();
 });
 
+final activeListDetailsProvider = FutureProvider<Map<String, dynamic>>((ref) {
+  return ref.watch(sharedListRepositoryProvider).getActiveListDetails();
+});
+
 final membersProvider = StreamProvider<List<SharedMember>>((ref) {
   return ref.watch(sharedListRepositoryProvider).watchMembers();
 });

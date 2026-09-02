@@ -52,8 +52,10 @@ service cloud.firestore {
       allow read: if isSharedListMember(listId) || isSharedListOwner(listId);
       allow update: if isSharedListOwner(listId)
         && request.resource.data.ownerId == resource.data.ownerId
-        && request.resource.data.inviteCode == resource.data.inviteCode
-        && request.resource.data.createdAt == resource.data.createdAt;
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name', 'budget', 'inviteCode', 'updatedAt'
+        ]);
       allow delete: if isSharedListOwner(listId);
 
       match /members/{memberId} {
@@ -112,7 +114,11 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && getAfter(listPath(request.resource.data.listId)).data.ownerId == request.auth.uid
         && getAfter(listPath(request.resource.data.listId)).data.inviteCode == code;
-      allow update, delete: if false;
+      allow update: if false;
+      allow delete: if isSignedIn()
+        && resource.data.ownerId == request.auth.uid
+        && getAfter(listPath(resource.data.listId)).data.ownerId == request.auth.uid
+        && getAfter(listPath(resource.data.listId)).data.inviteCode != code;
     }
 
     match /templates/{templateId} {
