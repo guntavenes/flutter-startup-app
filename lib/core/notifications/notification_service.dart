@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:ceyizim_plus/main.dart';
+import 'package:ceyizim_plus/core/navigation/navigation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {

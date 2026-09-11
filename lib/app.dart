@@ -3,7 +3,10 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'core/theme/app_theme.dart';
 import 'core/config/app_update_gate.dart';
+import 'core/navigation/navigation.dart';
 import 'features/onboarding/presentation/onboarding_screen.dart';
+import 'features/items/presentation/planned_items_screen.dart';
+import 'features/items/domain/planned_item_filter.dart';
 
 class StartupApp extends StatelessWidget {
   const StartupApp({super.key});
@@ -13,6 +16,7 @@ class StartupApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       title: 'Çeyiz Takip',
+      navigatorKey: navigatorKey,
 
       theme: AppTheme.lightTheme,
       themeMode: ThemeMode.light,
@@ -29,6 +33,10 @@ class StartupApp extends StatelessWidget {
       ],
 
       home: const AppUpdateGate(child: OnboardingGate()),
+      routes: {
+        '/today-planned-items': (_) =>
+            const PlannedItemsScreen(filter: PlannedItemFilter.today),
+      },
       builder: (context, child) => MediaQuery.withClampedTextScaling(
         minScaleFactor: .9,
         maxScaleFactor: 1.6,

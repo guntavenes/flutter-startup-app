@@ -51,7 +51,8 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCOt6NPHp6TXcsRCdUGoSC6Hj5vkjnw0eI',
-    appId: '1:268039661382:android:52e90454ad099aa7f3a747',
+    // Firebase Android app registered for com.enesguntav.ceyizimplus.
+    appId: '1:268039661382:android:ed2f7e724fde2bb5f3a747',
     messagingSenderId: '268039661382',
     projectId: 'my-ceyiz-takip',
     storageBucket: 'my-ceyiz-takip.firebasestorage.app',
